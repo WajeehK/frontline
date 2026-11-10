@@ -35,6 +35,10 @@
    <div class="tug"><span id="sideA" class="sa">–</span><div class="bar"><i id="tugA"></i><i id="tugB"></i><em id="tugM"></em></div><span id="sideB" class="sb">–</span></div>
    <div class="tugsub"><span id="pA"></span><span id="pB"></span></div>
   </div>
+  <button id="sent" class="sent" aria-label="Coverage sentiment. Tap for how it is calculated">
+   <div class="lbl"><span>SENTIMENT · 24H <em>based on reported coverage</em></span><span id="sentW" class="sw0">–</span></div>
+   <div class="srow"><span class="se">De-esc.</span><div class="sbar2"><i id="sentFill"></i><em id="sentM"></em></div><span class="se">Esc.</span><span id="sentT" class="st"></span></div>
+  </button>
  </div>
  <div id="mkt" class="mkt" aria-label="Markets (tap to pause)"></div>
  <div class="row3"><div id="mode" class="modechip">REPLAY · LAST 48H</div></div>
@@ -59,6 +63,7 @@
 <aside id="sides" class="sheet glass" aria-label="Sides scoreboard"><div class="grab"></div><div class="shead"><h2>Sides · reported events</h2></div><div id="sidesBody" class="slist"></div></aside>
 <aside id="opts" class="sheet glass" aria-label="Layers and alerts"><div class="grab"></div><div class="shead"><h2>Alerts & layers</h2></div><div id="optsBody" class="slist prose"></div></aside>
 <div id="brk" aria-live="assertive"></div>
+<aside id="sentS" class="sheet glass small" aria-label="How sentiment is calculated"><div class="grab"></div><div class="shead"><h2>Sentiment · how it works</h2></div><div id="sentBody" class="slist prose"></div></aside>
 <aside id="about" class="sheet glass" aria-label="About">
  <div class="grab"></div>
  <div class="slist prose" id="aboutBody"></div>

@@ -66,7 +66,7 @@ const ground = (lat, lon, lift = 0) => { const p = proj(lat, lon); p.y = hAt(p.x
 const inMap = (lat, lon) => lon >= BB[0] && lon <= BB[2] && lat >= BB[1] && lat <= BB[3];
 const TERR_V = `attribute float elev; varying float vE; varying vec3 vN; varying vec2 vUv; varying vec3 vW; varying float vFog;
 void main(){ vE=elev; vN=normalize(normalMatrix*normal); vUv=uv; vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vec4 mv=viewMatrix*w; vFog=-mv.z; gl_Position=projectionMatrix*mv; }`;
-const TERR_F = `uniform float uTime; uniform float uFog; uniform vec3 uLight; varying float vE; varying vec3 vN; varying vec2 vUv; varying vec3 vW; varying float vFog;
+const TERR_F = `uniform float uTime; uniform float uFog; uniform vec3 uLight; uniform vec4 uHit[6]; uniform vec3 uHitC[6]; uniform vec4 uRad; varying float vE; varying vec3 vN; varying vec2 vUv; varying vec3 vW; varying float vFog;
 void main(){
  float land=smoothstep(-2.,2.,vE);
  float h=clamp(vE/3200.,0.,1.);
@@ -82,6 +82,14 @@ void main(){
  sc+=vec3(.05,.12,.2)*grid*.35;
  float sh=sin(vW.x*3.+uTime*.6)*sin(vW.z*2.3-uTime*.4); sc+=vec3(.02,.05,.08)*smoothstep(.85,1.,sh)*(1.-d);
  vec3 col=mix(sc,lc,land);
+ // impacts: hot core light, expanding shockwave ring, lingering embers (x,z,age 0..1,intensity)
+ for(int i=0;i<6;i++){ vec4 H=uHit[i]; if(H.w<=0.) continue; float r=length(vW.xz-H.xy); float a=H.z;
+  float core=exp(-r*r/(.02+.05*a))*(1.-a)*1.6; float wave=exp(-pow((r-a*1.4)*14.,2.))*(1.-a)*.9; float emb=exp(-r*r/.012)*.35*(1.-a*a);
+  col+=uHitC[i]*(core+wave*.6+emb)*H.w; }
+ // ambient radar sweep around the theatre focus
+ if(uRad.w>0.){ vec2 q=vW.xz-uRad.xy; float r=length(q); float ang=atan(q.y,q.x); float sw=mod(uTime*.55,6.2832)-3.1416; float da=mod(sw-ang+6.2832,6.2832);
+  float fall=smoothstep(uRad.z,uRad.z*.2,r); float sweep=exp(-da*2.2)*fall; float rings=(1.-smoothstep(0.,fwidth(r/1.6)*1.5,abs(fract(r/1.6)-.5)-.47))*fall*.35;
+  col+=vec3(.25,.75,.45)*(sweep*.08+rings*.045)*uRad.w; }
  float coast=1.-smoothstep(0.,1.6,abs(vE)/max(fwidth(vE),1.));
  col+=vec3(.35,.6,.8)*coast*.55;
  float e=min(min(vUv.x,1.-vUv.x),min(vUv.y,1.-vUv.y)); col*=smoothstep(0.,.07,e);
@@ -90,7 +98,10 @@ void main(){
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
 }`;
-const terrMat = new THREE.ShaderMaterial({ vertexShader: TERR_V, fragmentShader: TERR_F, uniforms: { uTime: { value: 0 }, uFog: { value: 0.028 }, uLight: { value: new THREE.Vector3(-0.5, 0.8, 0.35) } } });
+const terrMat = new THREE.ShaderMaterial({ vertexShader: TERR_V, fragmentShader: TERR_F, uniforms: { uTime: { value: 0 }, uFog: { value: 0.028 }, uLight: { value: new THREE.Vector3(-0.5, 0.8, 0.35) }, uHit: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) }, uHitC: { value: Array.from({ length: 6 }, () => new THREE.Color()) }, uRad: { value: new THREE.Vector4(0, 0, 9, 1) } } });
+let hitI = 0;
+function groundHit(p, sev, color = 0xff7a2a, dur = 2600) { const i = hitI++ % 6; const H = terrMat.uniforms.uHit.value[i]; terrMat.uniforms.uHitC.value[i].set(color); const st = performance.now(); const w = .5 + sev * .18;
+  H.set(p.x, p.z, 0, w); fx.push(now => { const t = (now - st) / dur; if (t >= 1) { if (H.x === p.x) H.w = 0; return false; } if (H.x === p.x) H.z = t; return true; }); }
 
 async function loadImage(src) { const im = new Image(); im.src = src; await im.decode(); return im; }
 async function buildTerrain(tid, th) {
@@ -168,7 +179,8 @@ function buildMarkers(th) {
     const ring = new THREE.Mesh(RING, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: .55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     ring.position.copy(p).y += .01; ring.scale.setScalar(.09); markers.add(ring);
     const gl = sprite(GLOW, col, .16); gl.position.copy(p).y += hgt; markers.add(gl);
-    const a = { side, name, kind, lat, lon, p, ring, gl, phase: Math.random() * 6 };
+    let ping = null; if (kind === 'capital' || kind === 'nuclear' || kind === 'base' || kind === 'naval') { ping = new THREE.Mesh(RING2, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); ping.position.copy(p).y += .012; markers.add(ping); }
+    const a = { side, name, kind, lat, lon, p, ring, gl, ping, phase: Math.random() * 6 };
     assets.push(a);
     addLabel(`<i>${GLY[kind] || '●'}</i>${esc(name)}`, 'as ' + side, p.clone().setY(p.y + hgt + .06), kind === 'capital' ? 6 : kind === 'nuclear' ? 5 : 4, { ay: 1, op: .85, maxD: kind === 'capital' ? 99 : 23 });
   }
@@ -177,6 +189,17 @@ function buildMarkers(th) {
     addLabel(esc(t), sea ? 'sea' : 'cty', ground(lat, lon, .02), sea ? 1 : 2);
   }
 }
+
+// ---------------------------------------------------------------- adaptive quality (target 60fps on mid-range phones)
+const Q = { low: false, pr: renderer.getPixelRatio(), acc: 0, n: 0, good: 0,
+  frame(ms) { if (!(ms > 0 && ms < 250) || document.hidden) return; this.acc += ms; this.n++; if (this.n < 90) return; const avg = this.acc / this.n; this.acc = 0; this.n = 0;
+    if (avg > 21 && this.pr > .85) { this.pr = Math.max(.85, this.pr - .25); renderer.setPixelRatio(this.pr); resize(); this.good = 0; }
+    else if (avg > 21) { this.low = true; motes.visible = false; terrMat.uniforms.uRad.value.w = .6; }
+    else if (avg < 13 && ++this.good > 6 && this.pr < Math.min(devicePixelRatio || 1, DESK.matches ? 2 : 1.75)) { this.pr = Math.min(this.pr + .25, Math.min(devicePixelRatio || 1, DESK.matches ? 2 : 1.75)); renderer.setPixelRatio(this.pr); resize(); this.good = 0; } } };
+// ambient dust motes drifting over the map
+const motes = (() => { const n = 260, g = new THREE.BufferGeometry(), a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = (Math.random() - .5) * 26; a[i * 3 + 1] = .3 + Math.random() * 2.2; a[i * 3 + 2] = (Math.random() - .5) * 20; }
+  g.setAttribute('position', new THREE.BufferAttribute(a, 3)); const m = new THREE.PointsMaterial({ color: 0xffd9b0, size: .035, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false });
+  const pts = new THREE.Points(g, m); scene.add(pts); if (RMQ.matches) pts.visible = false; return pts; })();
 
 // ---------------------------------------------------------------- effects
 const fx = [];
@@ -192,16 +215,19 @@ function explosion(p, sev, color = 0xff7a1a) {
   const rm = new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
   const ring = add(new THREE.Mesh(RING, rm)); ring.position.copy(p).y += .02;
   fade(ring, rm, 1100, t => { ring.scale.setScalar(s * (1 + 9 * Math.sqrt(t))); rm.opacity = (1 - t) * .9; });
-  const nS = 3 + sev * 2;
+  const nS = Q.low ? 2 + sev : 3 + sev * 2;
   for (let i = 0; i < nS; i++) {
     const sm = add(sprite(SMOKE, new THREE.Color(0x6a6560), s * 2, false)); const dx = (Math.random() - .5) * s * 2, dz = (Math.random() - .5) * s * 2, d0 = Math.random() * .25;
     sm.position.set(p.x + dx, p.y, p.z + dz); sm.material.opacity = 0;
     fade(sm, sm.material, 4200 + sev * 500, t => { const u = Math.max(0, (t - d0) / (1 - d0)); sm.material.opacity = Math.sin(Math.min(1, u) * Math.PI) * .55; sm.position.y = p.y + u * s * 5; sm.scale.setScalar(s * (1.5 + u * 4)); });
   }
-  for (let i = 0; i < 6 + sev * 3; i++) {
+  for (let i = 0; i < (Q.low ? 3 + sev : 6 + sev * 3); i++) {
     const sp = add(sprite(GLOW, new THREE.Color(0xffb060), .05)); const v = new THREE.Vector3((Math.random() - .5) * 2, Math.random() * 2 + .6, (Math.random() - .5) * 2).multiplyScalar(s * 2.2);
     fade(sp, sp.material, 900, t => { sp.position.set(p.x + v.x * t, p.y + v.y * t - 2.2 * t * t * s, p.z + v.z * t); sp.material.opacity = 1 - t; });
   }
+  groundHit(p, sev, color);
+  if (sev >= 4 && !Q.low) { const col = add(new THREE.Mesh(BEAM, new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }))); col.position.copy(p);
+    fade(col, col.material, 900, t => { col.scale.set(6 * (1 - t) + 1, (1.4 + sev * .2) * Math.sqrt(t) + .01, 6 * (1 - t) + 1); col.material.opacity = (1 - t) * .8; }); }
   shake = Math.min(1.2, shake + .04 * sev ** 1.6);
 }
 function arcPath(a, b, hmul = .35) { const mid = a.clone().lerp(b, .5); mid.y += Math.max(.6, a.distanceTo(b) * hmul); return new THREE.QuadraticBezierCurve3(a, mid, b); }
@@ -213,6 +239,7 @@ function projectile(curve, { color = 0xff8a3a, dur = 1600, delay = 0, size = .09
   const line = add(new THREE.Line(tg, tm)); const hist = []; let lastPuff = 0; const st = performance.now() + delay; const cc = new THREE.Color(color); let hit = false;
   fx.push(now => {
     const t = (now - st) / dur; if (t < 0) return true;
+    if (!head.userData.l) { head.userData.l = 1; const p0 = curve.getPoint(0); const lf = add(sprite(GLOW, new THREE.Color(0xfff0d0), size * 5)); lf.position.copy(p0); fade(lf, lf.material, 500, u => { lf.material.opacity = 1 - u; lf.scale.setScalar(size * (5 + 6 * u)); }); groundHit(p0, 1, color, 1400); }
     if (t < 1) { const e = t < .5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2; const q = curve.getPoint(.15 * t + .85 * e); head.visible = true; head.position.copy(q); hist.unshift(q.clone());
       if (now - (lastPuff || 0) > 45) { lastPuff = now; const pf = add(sprite(GLOW, cc, size * 1.3)); pf.position.copy(q); const ps = add(sprite(SMOKE, new THREE.Color(0x8a8580), size * 1.2, false)); ps.position.copy(q);
         fade(pf, pf.material, 700, u => { pf.material.opacity = (1 - u) * .7; pf.scale.setScalar(size * (1.3 - u)); });
@@ -354,12 +381,15 @@ function pinsAt(T) { // show only reports from the 24h before T, fading by age
 
 // ---------------------------------------------------------------- camera
 const camGoal = { target: null, dist: null };
-function flyTo(p, dist) { if (performance.now() - S.userAt < 15000) return; camGoal.target = p.clone(); camGoal.dist = dist ?? (DESK.matches ? 11 : 12.5); }
+function flyTo(p, dist) { if (performance.now() - S.userAt < 15000) return; camGoal.target = p.clone(); camGoal.dist = dist ?? (DESK.matches ? 11 : 12.5);
+  const off = camera.position.clone().sub(controls.target); const far = controls.target.distanceTo(p);
+  camGoal.fl = { t0: performance.now(), dur: RMQ.matches ? 1 : Math.min(2600, 1100 + far * 160), a: controls.target.clone(), d0: off.length(), arc: Math.min(.35, far * .025) }; }
 function homeCam() {
   const f = S.th.focus; const p = ground(f[0], f[1]); p.y = 0;
   const asp = innerWidth / innerHeight; const d = asp < 1 ? 19 / Math.max(.45, asp) * .42 : 15;
   controls.target.copy(p); camera.position.set(p.x, p.y + d * .78, p.z + d * .62); controls.update();
   camGoal.target = p.clone(); camGoal.dist = d; S.home = { p: p.clone(), d };
+  terrMat.uniforms.uRad.value.set(p.x, p.z, Math.max(7, d * .6), Q.low ? .6 : 1);
 }
 
 // ---------------------------------------------------------------- metrics (fixed rules, same as scripts/fetch.py)
@@ -488,7 +518,7 @@ function go(i) {
   $('#about').classList.toggle('open', i === 4);
   $('#sides').classList.toggle('open', i === 2);
   $('#replay').classList.toggle('open', i === 3);
-  $('#thSheet').classList.remove('open'); $('#opts').classList.remove('open');
+  $('#thSheet').classList.remove('open'); $('#opts').classList.remove('open'); $('#sentS').classList.remove('open');
   $('#ticker').classList.toggle('hide', i !== 0 && !(DESK.matches && i === 1));
   $('#scrim').classList.toggle('on', (i === 1 && !DESK.matches) || i === 4 || i === 2);
   if (i === 1) renderFeed();
@@ -676,12 +706,40 @@ async function loadTheatre(tid) {
   clearWorld();
   const [d] = await Promise.all([getJSON('data/' + tid + '.json').catch(() => ({ events: [] })), buildTerrain(tid, S.th)]);
   buildMarkers(S.th); homeCam(); liveG.clear(); loadExtras(true);
+  if (!RMQ.matches) { S.rise = performance.now(); world.scale.y = .02; }
   S.seen = new Set(); S.events = mergeFast(toLeads(d)); S.events.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters(); S.live = [];
   for (const c of S.clusters) { if (Date.now() / 1000 - c.lead.ts < 7 * 86400) dropPin(c.lead, evPos(c.lead)); }
-  goLive(); S.nextAt = performance.now() + 1500;
+  goLive(); S.nextAt = performance.now() + 1500; renderSent();
   renderFeed();
   setTimeout(() => $('#boot').classList.add('gone'), 300);
 }
+
+
+// ---- sentiment bar (rule-based lexicon over recent incident headlines, plus GDELT tone when GDELT answers)
+function sentInfo() { return ((S.index && S.index.theatres) || []).find(t => t.id === S.tid)?.sent || null; }
+function renderSent() {
+  const x = sentInfo(); const btn = $('#sent'); if (!btn) return;
+  if (!x || x.score == null) { $('#sentW').textContent = 'not enough reports'; $('#sentM').style.left = '50%'; $('#sentFill').style.cssText = 'left:50%;width:0'; $('#sentT').textContent = ''; return; }
+  const v = 50 + 50 * x.score; const w = x.score > .25 ? 'ESCALATING' : x.score < -.25 ? 'DE-ESCALATING' : 'MIXED';
+  $('#sentW').textContent = w; $('#sentW').className = 'sw0 ' + (x.score > .25 ? 'esc' : x.score < -.25 ? 'de' : 'mix');
+  $('#sentM').style.left = v.toFixed(1) + '%';
+  $('#sentFill').style.cssText = v >= 50 ? `left:50%;width:${(v - 50).toFixed(1)}%` : `left:${v.toFixed(1)}%;width:${(50 - v).toFixed(1)}%`;
+  btn.classList.toggle('hot', x.score > .25); btn.classList.toggle('cool', x.score < -.25);
+  const d = x.prev == null ? null : x.score - x.prev;
+  $('#sentT').textContent = (d == null ? '' : (d > .05 ? '↑ ' : d < -.05 ? '↓ ' : '→ ')) + x.n + ' rep.';
+  $('#sentT').title = `24h trend vs previous 24h; based on ${x.n} incident headlines`;
+}
+function openSent() {
+  const x = sentInfo(); const f = v => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(2);
+  $('#sentBody').innerHTML = `<p>This bar reads the <b>tone of reported coverage</b>, not what is happening on the ground. It uses fixed word rules, no AI.</p>
+  <ul><li>Every incident headline from the last 24h (one per incident after merging outlets) is checked against two word lists: <b>escalatory</b> (strike, retaliate, missile, attack, killed, warns, invasion…) and <b>de-escalatory</b> (talks, ceasefire, truce, deal, negotiations, aid, release…).</li>
+  <li>A headline scores (escalatory − de-escalatory) ÷ (total matched words), from −1 to +1. Phrases like “talks collapse” or “rejects ceasefire” count as escalatory.</li>
+  <li>The bar is the average over all matching headlines. When the GDELT tone API answers (it often rate-limits), its 24h average tone for the conflict is blended in at 25% (tone −3 = neutral; more negative = more escalatory).</li>
+  <li>The arrow compares with the previous 24 hours. Below 0.25 either way it reads <b>Mixed</b>.</li></ul>
+  ${x ? `<p class="small">Now: score ${f(x.score)} (wording ${f(x.lex)}${x.gdelt ? `, GDELT tone ${x.gdelt.tone} from ${x.gdelt.n} samples` : ', GDELT tone unavailable'}). Based on ${x.n} of ${x.n_all} incident headlines in 24h; previous 24h ${f(x.prev)} from ${x.n_prev}. Few reports = low confidence.</p>` : '<p class="small">No data yet.</p>'}`;
+  $('#sentS').classList.add('open'); $('#scrim').classList.add('on');
+}
+$('#sent').addEventListener('click', openSent);
 
 // ---- fast lane: Al Jazeera items published by the box poller (scripts/live.py) to a public ntfy topic, polled every minute
 const LIVE_TOPIC = 'fl-live-8143ad24bad1fb3ffba4'; S.fast = {};
@@ -708,7 +766,7 @@ async function pollFast() {
 }
 async function poll() {
   try {
-    S.index = await getJSON('data/index.json');
+    S.index = await getJSON('data/index.json'); renderSent();
     const d = await getJSON('data/' + S.tid + '.json');
     const all = mergeFast(toLeads(d)); const fresh = all.filter(e => !S.seen.has(e.id));
     loadExtras();
@@ -725,14 +783,23 @@ function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h
 addEventListener('resize', resize);
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  const dt = Math.min(.05, (now - last) / 1000); Q.frame(now - last); last = now;
   terrMat.uniforms.uTime.value = now / 1000;
   tick(now);
   for (let i = fx.length - 1; i >= 0; i--) if (!fx[i](now)) fx.splice(i, 1);
-  for (const a of assets) { const s = 1 + .25 * Math.sin(now / 700 + a.phase); a.ring.scale.setScalar(.09 * s); a.gl.material.opacity = .6 + .3 * Math.sin(now / 500 + a.phase); }
+  for (const a of assets) { const s = 1 + .25 * Math.sin(now / 700 + a.phase); a.ring.scale.setScalar(.09 * s); a.gl.material.opacity = .6 + .3 * Math.sin(now / 500 + a.phase);
+    if (a.ping) { const u = ((now / 1000 + a.phase) % 3.2) / 3.2; a.ping.scale.setScalar(.06 + u * .34); a.ping.material.opacity = (1 - u) ** 2 * .5; } }
+  if (motes.visible) { motes.rotation.y = now / 90000; motes.position.y = Math.sin(now / 4000) * .05; }
+  if (S.rise != null) { const u = Math.min(1, (now - S.rise) / 1300); world.scale.y = .02 + .98 * (1 - (1 - u) ** 3); if (u >= 1) S.rise = null; }
   camera.position.sub(_shk);
   const idle = performance.now() - S.userAt > 15000;
-  if (camGoal.target && idle) {
+  if (camGoal.target && idle && camGoal.fl) {  // eased flight: smootherstep path + altitude arc
+    const F = camGoal.fl; const u = Math.min(1, (now - F.t0) / F.dur); const e = u * u * u * (u * (u * 6 - 15) + 10);
+    const off = camera.position.clone().sub(controls.target);
+    controls.target.copy(F.a).lerp(camGoal.target, e);
+    off.setLength((F.d0 + (camGoal.dist - F.d0) * e) * (1 + F.arc * Math.sin(Math.PI * e)));
+    camera.position.copy(controls.target).add(off); if (u >= 1) camGoal.fl = null;
+  } else if (camGoal.target && idle) {
     const k = 1 - Math.exp(-dt * 1.6);
     const off = camera.position.clone().sub(controls.target);
     controls.target.lerp(camGoal.target, k);

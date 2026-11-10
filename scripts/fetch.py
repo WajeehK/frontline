@@ -88,7 +88,7 @@ NATURAL = re.compile(r"\b(floods?|flooding|earthquake|quake|storms?|thunderstorm
 ATTRITION = re.compile(r"\b(los(es|t)|toll|losses)\b")
 ACTION = re.compile(r"\b(strikes?|struck|attack(s|ed|ing)?|bomb(s|ed|ing)?|launch(es|ed)?|fire[sd]?|hits?|hit by|kill(s|ed|ing)?|dead|shell(s|ed|ing)|raid(s|ed)?|downs?|downed|shot down|shoots? down|intercept(s|ed)?|seiz(e|es|ed|ure)|clash(es|ed)?|fighting|explosions?|blasts?|pound(s|ed)|targets?|targeted|sinks?|sank|sunk|captur\w+|advance[sd]? (on|into|towards?)|wounded|injured|assault|offensive|barrage|retaliat\w+|carr(y|ies|ied) out|blockade|boarded|destroy\w*|damag\w*|hitting|ablaze|on fire|shot dead)\b")
 CAPAB = re.compile(r"\b(able to|capab\w+|develop\w*|build(s|ing)?|produc\w+|unveil\w*|showcas\w+|parades?|exercises?|drills?|manufactur\w+)\b")
-HYPO = re.compile(r"\b(could|would|may|might|ready to|ready for|seeks?|seeking|response to|threaten\w*|if necessary|vows? to|plans? to|consider\w*|warns?|prepar\w+ to|possible|options?|weighs?)\b")
+HYPO = re.compile(r"\b(unlikely|rules? out|ruled out|no plans? to|could|would|may|might|ready to|ready for|seeks?|seeking|response to|threaten\w*|if necessary|vows? to|plans? to|consider\w*|warns?|prepar\w+ to|possible|options?|weighs?)\b")
 INTERCEPT = re.compile(r"\b(intercept(s|ed|ing|ion|ions)?|shot down|shoots? down|downs|downed|air defen[cs]es? (destroy|down)\w*|neutrali[sz]ed)\b", re.I)
 KINETIC = {"missile", "drone", "air", "naval", "ground"}
 SIDE_ALIASES = {
@@ -360,6 +360,26 @@ def make_event(tid, it):
     return eid, {"id": eid, "ts": int(it['ts']), "title": title[:220], "desc": (it.get('desc') or '')[:220], "url": it['url'],
                "outlet": it['outlet'], "via": it.get('via', 'RSS'), "type": typ, "sev": sev, "actor": act, "atk": atk, "icp": icp, "men": men, "loc": loc}
 
+# ---- coverage sentiment (fixed lexicon, no AI): escalatory vs de-escalatory wording in recent headlines
+ESC_W = re.compile(r"\b(strikes?|struck|airstrikes?|attack(s|ed|ing)?|retaliat\w*|escalat\w*|missiles?|drones?|bomb\w*|kill(s|ed|ing)?|dead|deaths?|invad\w*|invasion|offensive|threat(s|en\w*)?|warn(s|ed|ing)?|war|wars|mobili[sz]\w*|shell(s|ed|ing)|assault\w*|raids?|clash(es|ed)?|revenge|ultimatum|seiz\w*|explosions?|blasts?|launch(es|ed)?|fire[sd]?|intercept\w*|casualt\w*|wounded|injur\w*|sanction\w*|hostil\w*|bombard\w*|siege)\b", re.I)
+DE_W = re.compile(r"\b(talks?|ceasefire|cease-fire|truce|peace|negotiat\w*|deal|agreements?|diplomac\w*|diplomat\w*|dialogue|de-?escalat\w*|calm|restraint|releas\w*|exchanges?|humanitarian|aid|mediat\w*|summit|withdraw\w*|pause[sd]?|reopen\w*|accords?|envoys?|meet(s|ing)?|met|reconcil\w*|handover|resum\w*)\b", re.I)
+NEG_DE = re.compile(r"\b(reject\w*|collaps\w*|fail\w*|stall\w*|break(s|ing)? down|broke down|violat\w*|suspend\w*|walk(s|ed)? out|call(s|ed)? off|no deal|end(s|ed)? (the )?(truce|ceasefire))\b", re.I)
+def tone_lex(title):
+    e = len(ESC_W.findall(title)); d = len(DE_W.findall(title))
+    if d and NEG_DE.search(title): e, d = e + d, 0  # "talks collapse", "rejects ceasefire" read as escalatory
+    if not e and not d: return None
+    return (e - d) / (e + d)
+def sentiment(evs, t0, t1):
+    sc = [x for x in (tone_lex(e['title']) for e in evs if t0 <= e['ts'] < t1) if x is not None]
+    n_all = sum(1 for e in evs if t0 <= e['ts'] < t1)
+    return (round(sum(sc) / len(sc), 3) if sc else None), len(sc), n_all
+def gdelt_tone(th):
+    q = '(' + ' OR '.join(('"%s"' % k if ' ' in k else k) for k in th['keywords']['must'][:10]) + ') sourcelang:english'
+    u = 'https://api.gdeltproject.org/api/v2/doc/doc?' + urllib.parse.urlencode({'query': q, 'mode': 'timelinetone', 'format': 'json', 'timespan': '24h'})
+    j = json.loads(get(u, 30).decode('utf-8', 'replace'))
+    vals = [d['value'] for s in j.get('timeline', []) for d in s.get('data', []) if d.get('value') not in (None, 0)]
+    return (round(sum(vals) / len(vals), 2), len(vals)) if vals else None
+
 def main():
     items, status = [], []
     for name, url in FEEDS:
@@ -385,6 +405,9 @@ def main():
                 gd = 'unavailable (' + str(e)[:40] + ')'; time.sleep(12)
     status.append({"src": "GDELT DOC 2.0", "ok": isinstance(gd, int), "n": gd})
     index = {"updated": int(NOW), "theatres": [], "sources": status}
+    try: old_ix = {t['id']: t for t in json.load(open(os.path.join(ROOT, 'data/index.json'))).get('theatres', [])}
+    except Exception: old_ix = {}
+    tids = list(T); rot = tids[int(NOW // 900) % len(tids)]  # one GDELT tone call per run, rotating theatres
     for tid, th in T.items():
         path = os.path.join(ROOT, f'data/{tid}.json')
         old = json.load(open(path)) if os.path.exists(path) else {"events": []}
@@ -409,7 +432,20 @@ def main():
         d1, d7 = win(24), win(168)
         s24, s7 = score(d1), score(d7) / 7
         json.dump({"id": tid, "events": evs, "clusters": cls}, open(path, 'w'), separators=(',', ':'), ensure_ascii=False)
-        index['theatres'].append({"id": tid, "name": th['name'], "n24": len(d1), "n7": len(d7), "k24": sum(1 for e in d1 if e['type'] in KINETIC),
+        gt = (old_ix.get(tid, {}).get('sent') or {}).get('gdelt')
+        if tid == rot and not os.environ.get('GDELT_OFF'):
+            try:
+                r = gdelt_tone(th)
+                if r: gt = {"tone": r[0], "n": r[1], "at": int(NOW)}
+            except Exception as e: print('gdelt tone', tid, str(e)[:60])
+        if gt and NOW - gt.get('at', 0) > 6 * 3600: gt = None
+        lx, nsc, nall = sentiment(cls, NOW - 86400, NOW + 600); lxp, nscp, _ = sentiment(cls, NOW - 2 * 86400, NOW - 86400)  # one headline per incident
+        def comb(l):
+            if l is None: return None
+            if gt: g = max(-1, min(1, -(gt['tone'] + 3) / 3)); return round(.75 * l + .25 * g, 3)
+            return l
+        sent = {"score": comb(lx), "prev": comb(lxp), "lex": lx, "n": nsc, "n_all": nall, "n_prev": nscp, "gdelt": gt}
+        index['theatres'].append({"id": tid, "sent": sent, "name": th['name'], "n24": len(d1), "n7": len(d7), "k24": sum(1 for e in d1 if e['type'] in KINETIC),
                                   "esc24": round(100 * (1 - math.exp(-s24 / 30))), "esc7": round(100 * (1 - math.exp(-s7 / 30))), "total": len(cls)})
     npath = os.path.join(ROOT, 'data/naval.json')
     try: oldn = json.load(open(npath)).get('reports', [])
