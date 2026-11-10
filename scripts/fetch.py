@@ -203,17 +203,18 @@ def main():
             status.append({"src": name, "url": url, "ok": False, "err": str(e)[:80]})
     # GDELT (best effort; rate-limited to 1 request / 5 s)
     gd = {}
-    for tid, q in (GDELT_Q.items() if not os.environ.get('GDELT_OFF') else []):
-        u = 'https://api.gdeltproject.org/api/v2/doc/doc?' + urllib.parse.urlencode({'query': q + ' sourcelang:english', 'mode': 'artlist', 'format': 'json', 'maxrecords': '75', 'timespan': os.environ.get('GDELT_SPAN', '2d'), 'sort': 'datedesc'})
+    # one combined request per run keeps us well inside GDELT's 1-request-per-5s limit
+    GQ = {"all": '(Iran OR Tehran OR IRGC OR Hormuz OR Gaza OR Hezbollah OR Hamas OR Ukraine OR Kyiv OR Houthi OR Houthis OR "Red Sea") (strike OR missile OR drone OR attack OR ceasefire OR talks OR killed)'}
+    for tid, q in (GQ.items() if not os.environ.get('GDELT_OFF') else []):
+        u = 'https://api.gdeltproject.org/api/v2/doc/doc?' + urllib.parse.urlencode({'query': q + ' sourcelang:english', 'mode': 'artlist', 'format': 'json', 'maxrecords': '250', 'timespan': os.environ.get('GDELT_SPAN', '2d'), 'sort': 'datedesc'})
         try:
-            time.sleep(6)
             j = json.loads(get(u, 40).decode('utf-8', 'replace'))
             arts = j.get('articles', [])
             for a in arts:
                 sd = a.get('seendate', '')
                 try: ts = time.mktime(time.strptime(sd, '%Y%m%dT%H%M%SZ')) - time.timezone
                 except Exception: continue
-                items.append({"title": clean(a.get('title')), "url": a.get('url', ''), "ts": ts, "desc": '', "outlet": a.get('domain', 'GDELT'), "via": "GDELT", "hint": tid})
+                items.append({"title": clean(a.get('title')), "url": a.get('url', ''), "ts": ts, "desc": '', "outlet": a.get('domain', 'GDELT'), "via": "GDELT"})
             gd[tid] = len(arts)
         except Exception as e:
             gd[tid] = 'unavailable (' + str(e)[:40] + ')'

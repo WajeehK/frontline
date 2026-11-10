@@ -305,7 +305,7 @@ function evPos(e) {
   }
   const c = S.th.focus; return { p: ground(c[0], c[1]), where: null, unk: true };
 }
-const cap = s => s.replace(/\b\w/g, c => c.toUpperCase());
+const cap = s => s.replace(/\b\w/g, c => c.toUpperCase()).replace(/\b(Uk|Raf|Uae|Us|Npp|Idf)\b/g, w => w.toUpperCase());
 function callout(e, P) {
   const [nm, , col] = TY[e.type];
   const where = P.off ? `<span class="off">↗ ${esc(cap(P.where))} (off-map)</span>` : P.unk ? 'location not stated' : esc(cap(P.where)) + (P.approx ? ' (country-level)' : '');
