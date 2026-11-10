@@ -127,11 +127,11 @@ const labelsEl = $('#labels'); let labels = [];
 function addLabel(html, cls, p, pri, extra = {}) { const el = document.createElement('span'); el.className = cls; el.innerHTML = html; labelsEl.appendChild(el); const L = { el, p, pri, w: 0, h: 0, ...extra }; labels.push(L); return L; }
 const _v = new THREE.Vector3();
 function placeLabels() {
-  const W = innerWidth, H = innerHeight, placed = []; const hudB = $('#hud .meters').getBoundingClientRect().bottom;
+  const W = innerWidth, H = innerHeight, placed = []; const hudB = Math.max($('#hud .meters').getBoundingClientRect().bottom, ($('#mkt')?.getBoundingClientRect().bottom) || 0);
   const camD = camera.position.distanceTo(controls.target);
   const sorted = labels.slice().sort((a, b) => b.pri - a.pri);
   for (const L of sorted) {
-    if (L.dead) continue;
+    if (L.dead) continue; if (L.hide || L.dead2) { if (L._op !== 0) { L.el.style.opacity = 0; L._op = 0; } continue; }
     _v.copy(L.p).project(camera);
     let show = _v.z < 1 && _v.x > -1.1 && _v.x < 1.1 && _v.y > -1.1 && _v.y < 1.1 && (!L.maxD || camD < L.maxD);
     if (!L.w) { L.w = L.el.offsetWidth; L.h = L.el.offsetHeight; }
@@ -385,6 +385,7 @@ function ticker(e) {
    <div class="mt"><span class="tag" style="color:${col}">${nm}</span>${side ? `<span style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}<span>${esc(e.outlet)}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div></div>`;
   $('#ticker').classList.remove('hide');
 }
+function toLeads(d) { if (d.clusters) return d.clusters.map(c => ({ ...c, id: c.cid, via: (c.outlets && c.outlets[0] || {}).via })); return d.events || []; }
 function groupClusters() { const m = new Map(); for (const e of S.events) { if (!m.has(e.cid)) m.set(e.cid, { lead: e, more: [] }); else m.get(e.cid).more.push(e); } return [...m.values()]; }
 function renderFeed() {
   const f = S.filter; const T = S.mode === 'scrub' ? S.T : Infinity;
@@ -393,7 +394,7 @@ function renderFeed() {
     return `<div class="ev"><div class="h"><span class="tag" style="color:${col}">${ic} ${nm}</span><span class="sev" style="color:${col}">${'●'.repeat(e.sev)}${'○'.repeat(5 - e.sev)}</span>${side ? `<span style="color:${side.color};font-weight:700">${esc(side.short)} ▸</span>` : ''}${e.loc ? `<span>📍 ${esc(cap(e.loc.name))}</span>` : ''}</div>
     <a class="t" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
     <div class="m"><span>${esc(e.outlet)}${e.via === 'GDELT' ? ' (via GDELT)' : ''} · ${hm(e.ts)} · ${ago(e.ts)}</span><button data-id="${e.id}">Show on map ▸</button></div>
-    ${c.more.length ? `<details><summary>+${c.more.length} more report${c.more.length > 1 ? 's' : ''} of this</summary>${c.more.map(m => `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.outlet)} · ${esc(m.title)} ↗</a>`).join('')}</details>` : ''}</div>`; }).join('')
+    ${(e.outlets || []).length > 1 ? `<details><summary>Covered by ${e.outlets.length} outlets: ${esc(e.outlets.map(o => o.outlet).join(', '))}</summary>${e.outlets.map(m => `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.outlet)} · ${hm(m.ts)} · ${esc(m.title)} ↗</a>`).join('')}</details>` : ''}</div>`; }).join('')
     : `<div class="empty">No reports in this filter yet. Data refreshes every ~15 minutes.</div>`;
 }
 $('#feedList').addEventListener('click', ev => { const b = ev.target.closest('button[data-id]'); if (!b) return; const e = S.events.find(x => x.id === b.dataset.id); if (!e) return; S.userAt = -1e9; if (!DESK.matches) go(0); setTimeout(() => play(e), 250); });
@@ -415,7 +416,7 @@ function buildQueue() {
 }
 function tick(now) {
   if (S.mode === 'scrub') { if (S.playing) { const step = (now - (S.lastT || now)) / 1000 * 3600 * (S.speed === 1 ? 1.5 : 6); const T0 = S.T; S.T = Math.min(Date.now() / 1000, S.T + step); for (const e of S.clusters.map(c => c.lead)) if (e.ts > T0 && e.ts <= S.T) play(e); scrubUI(); if (S.T >= Date.now() / 1000 - 60) togglePlay(false); } S.lastT = now; return; }
-  if (S.live && S.live.length) { if (now > S.nextAt) { setMode('live'); play(S.live.shift()); S.nextAt = now + 5200; } return; }
+  if (S.live && S.live.length) { if (now > S.nextAt) { setMode('live'); const e = S.live.shift(); if (isMajor(e) && !BRK_SEEN.has(e.id) && Date.now() / 1000 - e.ts < 6 * 3600) { breaking(e); S.nextAt = now + 9000; } else { play(e); S.nextAt = now + 5200; } } return; }
   if (S.mode === 'live' && now > S.nextAt) setMode('loop');
   if (S.queue.length && now > S.nextAt) { const e = S.queue[S.qi % S.queue.length]; S.qi++; play(e); S.nextAt = now + (KIN.has(e.type) ? 4600 : 3600); if (S.qi % S.queue.length === 0) S.nextAt += 2500; }
   if (!S.queue.length && now > S.nextAt) { $('#ticker').innerHTML = '<div class="tx"><span class="tt">No reports in the last 7 days for this theatre.</span></div>'; S.nextAt = now + 1e9; }
@@ -431,6 +432,7 @@ function drawHist() {
   for (const c2 of S.clusters) { const e = c2.lead; const i = Math.min(N - 1, Math.floor((e.ts - a) / (b - a) * N)); if (i < 0) continue; bins[i][KIN.has(e.type) ? 0 : e.type === 'diplomacy' ? 2 : 1] += W5[e.sev]; }
   const mx = Math.max(4, ...bins.map(x => x[0] + x[1] + x[2])); const bw = r.width / N;
   bins.forEach((x, i) => { let y = r.height; [[0, '#ff5a3a'], [1, '#ffc04d'], [2, '#ffffff']].forEach(([k, col]) => { const h = x[k] / mx * (r.height - 4); g.fillStyle = col; g.globalAlpha = .75; g.fillRect(i * bw + 1, y - h, bw - 2, h); y -= h; }); });
+  g.globalAlpha = 1; for (const c2 of S.clusters) { const e = c2.lead; if (!isMajor(e)) continue; const x = (e.ts - a) / (b - a) * r.width; g.fillStyle = '#fff'; g.beginPath(); g.moveTo(x - 4, 0); g.lineTo(x + 4, 0); g.lineTo(x, 6); g.fill(); }
   $('#rStart').textContent = new Date(a * 1000).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 }
 slider.addEventListener('input', () => { const [a, b] = span(); S.T = a + (b - a) * slider.value / 1000; scrubUI(); renderFeed(); });
@@ -445,9 +447,10 @@ const ICON = {
   map: '<svg viewBox="0 0 24 24"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>',
   feed: '<svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
   replay: '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>',
+  sides: '<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M14 20v-7M20 20V8"/></svg>',
   info: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
 };
-const DOCK_T = [['map', 'Map'], ['feed', 'Feed'], ['replay', 'Replay'], ['info', 'About']];
+const DOCK_T = [['map', 'Map'], ['feed', 'Feed'], ['sides', 'Sides'], ['replay', 'Replay'], ['info', 'About']];
 const vib = n => { if (navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) try { navigator.vibrate(n) } catch (_) { } };
 let dock, bub, jel, tbs = [], dockI = 0, bw = 0, press = 1, ddrag = null, moved = 0;
 function spring(o) { const s = { x: 0, v: 0, target: 0, k: o.k, c: o.c, on: o.on, raf: 0, set(t, instant) { s.target = t; if (instant || RMQ.matches) { if (s.raf) { cancelAnimationFrame(s.raf); s.raf = 0 } s.x = t; s.v = 0; s.on(s.x, 0); return }
@@ -478,18 +481,20 @@ function go(i) {
   dockI = i; bs.set(slotX(i));
   document.body.classList.toggle('feedtab', i === 1);
   $('#feed').classList.toggle('open', i === 1 || DESK.matches);
-  $('#about').classList.toggle('open', i === 3);
-  $('#replay').classList.toggle('open', i === 2);
-  $('#thSheet').classList.remove('open');
+  $('#about').classList.toggle('open', i === 4);
+  $('#sides').classList.toggle('open', i === 2);
+  $('#replay').classList.toggle('open', i === 3);
+  $('#thSheet').classList.remove('open'); $('#opts').classList.remove('open');
   $('#ticker').classList.toggle('hide', i !== 0 && !(DESK.matches && i === 1));
-  $('#scrim').classList.toggle('on', (i === 1 && !DESK.matches) || i === 3);
+  $('#scrim').classList.toggle('on', (i === 1 && !DESK.matches) || i === 4 || i === 2);
   if (i === 1) renderFeed();
-  if (i === 2) { requestAnimationFrame(drawHist); if (S.mode !== 'scrub') { S.T = Date.now() / 1000; scrubUI(); } }
-  if (i !== 2 && S.mode === 'scrub') goLive();
-  if (i === 3) renderAbout();
+  if (i === 2) renderSides();
+  if (i === 3) { requestAnimationFrame(drawHist); if (S.mode !== 'scrub') { S.T = Date.now() / 1000; scrubUI(); } }
+  if (i !== 3 && S.mode === 'scrub') goLive();
+  if (i === 4) renderAbout();
 }
 $('#scrim').addEventListener('click', () => { go(0); });
-$('#noteMore').addEventListener('click', e => { e.preventDefault(); go(3); });
+$('#noteMore').addEventListener('click', e => { e.preventDefault(); go(4); });
 
 // ---------------------------------------------------------------- theatre picker + about
 $('#thBtn').addEventListener('click', () => {
@@ -509,8 +514,153 @@ function renderAbout() {
   <p style="color:var(--dim);font-size:11px">Terrain: AWS Terrain Tiles (Mapzen/Terrarium). Borders: Natural Earth via world-atlas. 3D: three.js.</p>`;
 }
 
+
+// ================================================================ v4: live layers, markets, scoreboard, alerts, breaking
+const liveG = new THREE.Group(); world.add(liveG);
+const LAY = Object.assign({ air: true, naval: true, bases: true, pins: true }, JSON.parse(localStorage.getItem('fl_lay') || '{}'));
+let liveLabels = [];
+const isMajor = e => KIN.has(e.type) && (e.sev >= 4 || (e.sev >= 3 && ['missile', 'air', 'drone'].includes(e.type)));
+function applyLayers() { markers.visible = LAY.bases; labels.forEach(l => { if (l.el.classList.contains('as')) l.dead2 = !LAY.bases; }); pinGroup.visible = LAY.pins; liveG.visible = LAY.air || LAY.naval; liveG.children.forEach(o => o.visible = LAY[o.userData.layer]); liveLabels.forEach(l => l.hide = !LAY[l.layer]); localStorage.setItem('fl_lay', JSON.stringify(LAY)); }
+const PLANE = (() => { const sh = new THREE.Shape(); sh.moveTo(0, .11); sh.lineTo(.02, .02); sh.lineTo(.09, -.02); sh.lineTo(.02, -.01); sh.lineTo(.015, -.07); sh.lineTo(.04, -.09); sh.lineTo(0, -.08); sh.lineTo(-.04, -.09); sh.lineTo(-.015, -.07); sh.lineTo(-.02, -.01); sh.lineTo(-.09, -.02); sh.lineTo(-.02, .02); sh.closePath(); const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return g; })();
+const HULL = (() => { const sh = new THREE.Shape(); sh.moveTo(0, .16); sh.lineTo(.035, .06); sh.lineTo(.035, -.12); sh.lineTo(-.035, -.12); sh.lineTo(-.035, .06); sh.closePath(); const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return g; })();
+S.extras = { ac: null, nav: null, mkt: null };
+async function loadExtras(rebuild) {
+  const [ac, nav, mkt] = await Promise.all(['aircraft', 'naval', 'markets'].map(n => getJSON('data/' + n + '.json').catch(() => null)));
+  S.extras = { ac, nav, mkt }; buildLive(); renderMarkets();
+}
+function buildLive() {
+  if (!S.th || !BB) return;
+  liveG.clear(); liveLabels.forEach(l => { l.dead = true; l.el.remove(); }); labels = labels.filter(l => !l.live); liveLabels = [];
+  const ac = S.extras.ac;
+  if (ac) for (const a of ac.ac) {
+    if (!inMap(a.lat, a.lon)) continue;
+    const p = ground(a.lat, a.lon); const alt = a.alt === 'ground' ? 0 : Math.max(0, +a.alt || 0);
+    p.y = Math.max(p.y, 0) + .25 + Math.min(1.1, alt / 40000);
+    const m = new THREE.Mesh(PLANE, new THREE.MeshBasicMaterial({ color: 0xffd479, side: THREE.DoubleSide, transparent: true, opacity: .95 }));
+    m.position.copy(p); m.rotation.y = -((+a.trk || 0) * Math.PI / 180); m.scale.setScalar(1.25); m.userData.layer = 'air'; liveG.add(m);
+    const st = new THREE.Mesh(BEAM, new THREE.MeshBasicMaterial({ color: 0xffd479, transparent: true, opacity: .18, depthWrite: false })); st.position.set(p.x, hAt(p.x, p.z), p.z); st.scale.y = p.y - hAt(p.x, p.z); st.userData.layer = 'air'; liveG.add(st);
+    const L = addLabel(`<i style="color:#ffd479">✈</i>${esc(a.fl || a.r || a.hex)}${a.t ? ' · ' + esc(a.t) : ''}`, 'as live', p.clone().setY(p.y + .08), 3, { ay: 1, op: .8, maxD: 16, live: true, layer: 'air' }); liveLabels.push(L);
+  }
+  const nav = S.extras.nav;
+  const seen = {};
+  if (nav) for (const r of nav.reports) {
+    if (!inMap(r.lat, r.lon) || Date.now() / 1000 - r.ts > 21 * 86400) continue;
+    const key = r.lat + ',' + r.lon, k = seen[key] = (seen[key] ?? -1) + 1; // ships reported in the same named area are fanned out around its centre
+    const p = ground(r.lat, r.lon); p.y = .02; let h = 0; for (const c of r.ship) h = (h * 31 + c.charCodeAt(0)) >>> 0; if (k) { p.x += Math.cos(k * 2.1) * .45; p.z += Math.sin(k * 2.1) * .45; }
+    const m = new THREE.Mesh(HULL, new THREE.MeshBasicMaterial({ color: 0x7fd8ff, side: THREE.DoubleSide, transparent: true, opacity: .9 })); m.position.copy(p); m.rotation.y = (h % 360) * Math.PI / 180; m.scale.setScalar(1.4); m.userData.layer = 'naval'; liveG.add(m);
+    const rg = new THREE.Mesh(RING2, new THREE.MeshBasicMaterial({ color: 0x7fd8ff, transparent: true, opacity: .5, depthWrite: false, side: THREE.DoubleSide })); rg.position.copy(p); rg.scale.setScalar(.22); rg.userData.layer = 'naval'; liveG.add(rg);
+    const d = new Date(r.ts * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    const L = addLabel(`<i style="color:#7fd8ff">⚓</i>${esc(r.ship)} <em class="rep">REPORTED ${esc(d)} · ${esc(r.outlet)}</em>`, 'as live', p.clone().setY(p.y + .1), 5, { ay: 1, op: .9, maxD: 30, live: true, layer: 'naval' }); liveLabels.push(L);
+  }
+  applyLayers(); renderLayerInfo();
+}
+function renderLayerInfo() {
+  const ac = S.extras.ac, nav = S.extras.nav; const el = $('#layInfo'); if (!el) return;
+  const nIn = ac ? ac.ac.filter(a => inMap(a.lat, a.lon)).length : 0; const nNav = nav ? nav.reports.filter(r => inMap(r.lat, r.lon)).length : 0;
+  el.innerHTML = `<p>✈ <b>${nIn}</b> military aircraft broadcasting over this map ${ac ? `(ADS-B snapshot ${esc(hm(ac.now))}, ${esc(ac.src)})` : '(feed unavailable)'}. Most military flights don’t broadcast, so this is never the full picture. Positions are shown exactly as reported and refresh about every 15 minutes.</p>
+   <p>⚓ <b>${nNav}</b> ships with <b>reported</b> positions from news articles in the last 21 days (not live AIS; no free live ship feed exists without sign-up). ${nav && nav.reports.length ? nav.reports.filter(r => inMap(r.lat, r.lon)).map(r => `<a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.ship)}: ${esc(cap(r.where))}, ${esc(r.outlet)} ${esc(new Date(r.ts * 1000).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }))} ↗</a>`).join('') : ''}</p>`;
+}
+// ---- market strip
+function spark(ser, w = 54, h = 18) {
+  if (!ser || ser.length < 2) return ''; const ys = ser.map(p => p[1]); const mn = Math.min(...ys), mx = Math.max(...ys), t0 = ser[0][0], t1 = ser[ser.length - 1][0];
+  const X = t => ((t - t0) / (t1 - t0 || 1) * w).toFixed(1), Y = v => (h - 2 - (v - mn) / (mx - mn || 1) * (h - 4)).toFixed(1);
+  const marks = S.events.filter(e => isMajor(e) && e.ts >= t0 && e.ts <= t1).map(e => `<line x1="${X(e.ts)}" x2="${X(e.ts)}" y1="0" y2="${h}" stroke="#ff5a3a" stroke-width="1" opacity=".8"/>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${marks}<polyline fill="none" stroke="currentColor" stroke-width="1.3" points="${ser.map(p => X(p[0]) + ',' + Y(p[1])).join(' ')}"/></svg>`;
+}
+const fmtP = q => { const v = q.last; if (v == null) return '–'; const s = v >= 1000 ? Math.round(v).toLocaleString('en-US') : v.toFixed(2); return (q.cur === 'USD' && q.kind !== 'fx' ? '$' : '') + s + (q.cur === 'GBp' ? 'p' : ''); };
+function renderMarkets() {
+  const m = S.extras.mkt, el = $('#mkt'); if (!el) return;
+  if (!m) { el.innerHTML = '<span class="mq dim">Markets unavailable</span>'; return; }
+  el.innerHTML = m.q.map(q => { const up = (q.ch || 0) >= 0; return `<span class="mq ${up ? 'up' : 'dn'}" title="${esc(q.name)} · ${esc(m.src)} · ${esc(hm(q.t))}"><b>${esc(q.name.replace('Lockheed Martin', 'LMT').replace('Northrop Grumman', 'NOC').replace('BAE Systems', 'BAE').replace('Dollar index', 'DXY'))}</b> ${fmtP(q)} <em>${q.ch == null ? '' : (up ? '▲' : '▼') + Math.abs(q.ch).toFixed(2) + '%'}</em>${spark(q.series)}</span>`; }).join('') + `<span class="mq dim">5-day · red lines = major reported strikes · ${esc(m.src)}</span>`;
+}
+// ---- sides scoreboard (counts of reported, classified incidents only)
+function renderSides() {
+  const now = S.mode === 'scrub' ? S.T : Date.now() / 1000; const sd = S.th.sides;
+  const win = h => clustersIn(now - h * 3600, now);
+  const rows = [['Attacks reported', e => KIN.has(e.type) && !e.icp, 'atk'], ['Interceptions reported', e => !!e.icp, 'icp'], ['Diplomatic moves', e => e.type === 'diplomacy', 'men'], ['Deployments', e => e.type === 'deploy', 'men'], ['Threats & warnings', e => e.type === 'threat', 'men']];
+  const cnt = (es, f, fld, side) => es.filter(e => f(e) && (fld === 'men' ? (e.men || []).includes(side) : e[fld === 'atk' ? 'atk' : 'icp'] === side)).length;
+  const d1 = win(24), d7 = win(168);
+  const unat = d7.filter(e => KIN.has(e.type) && !e.atk && !e.icp).length;
+  $('#sidesBody').innerHTML = `<div class="sbh"><span style="color:${sd[0].color}">${esc(sd[0].name)}</span><span>24h · 7d</span><span style="color:${sd[1].color}">${esc(sd[1].name)}</span></div>` +
+    rows.map(([lab, f, fld]) => { const a1 = cnt(d1, f, fld, 'A'), a7 = cnt(d7, f, fld, 'A'), b1 = cnt(d1, f, fld, 'B'), b7 = cnt(d7, f, fld, 'B'); const tot = Math.max(1, a7 + b7);
+      return `<div class="sbr"><div class="sbl">${lab}</div><div class="sbv"><span class="na" style="color:${sd[0].color}"><b>${a1}</b> · ${a7}</span><div class="sbbar"><i style="width:${a7 / tot * 100}%;background:${sd[0].color}"></i><i style="width:${b7 / tot * 100}%;background:${sd[1].color}"></i></div><span class="nb" style="color:${sd[1].color}">${b1} · <b>${b7}</b></span></div></div>`; }).join('') +
+    `<p class="sbn">Big number = last 24h (left) / 7 days (right). These are <b>reported events</b>: news incidents grouped across outlets and classified by fixed keyword rules (who acted comes from the headline wording). They are not casualty, damage or battlefield-control figures. ${unat} kinetic reports in 7 days named no clear actor and aren’t counted for either side.</p>
+     <h3 class="sbh2">Most-covered incidents · 7d</h3>${d7.filter(e => KIN.has(e.type)).sort((a, b) => (b.n || 1) - (a.n || 1) || b.sev - a.sev).slice(0, 5).map(e => `<a class="sbi" href="${esc(e.url)}" target="_blank" rel="noopener"><span class="tag" style="color:${TY[e.type][2]}">${TY[e.type][0]}</span> ${esc(e.title)} <small>${e.n || 1} outlet${(e.n || 1) > 1 ? 's' : ''} · ${ago(e.ts)}</small></a>`).join('') || '<p class="sbn">No kinetic reports in 7 days.</p>'}`;
+}
+// ---- options sheet: layers + alerts
+const VAPID = 'BHOiDmI_WYfE7wK2yi1zyAQfG18afV7hl1-9dCvlBnpi_PRHsAB4RZPCwTlnDpbxlSKG9A9hsA7zTyXq1PWnCVk', SPKI = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA/e0bYnNdyuxNqrZQaY7xk9Vf4t91ZQWKNDX81f0RyFuKn1otTPFKzMbEgoYcZbAYEVRU8KPqOJXnErFCK7l7A16Ha3I3NFBd2OcD8/biDGblsU5nxYX/NnqoO4IUnL7S6mS+zb7YIMCyi8M8AxQh1E5jaLZyl+mnUTSyFlR+XiDTbscYRKVDYshn/M7w91WIB4sMKdjNSzflKDAuCNdptmP3yX9ptGJWMDJA1bfTl2u7KXKGxdoubxcqgKztB6jO6H/QitLMs8vZQyJ4BkxYQAFixEOTBmCT2ZsT278gUfVhK8HdnKkYzbFnBRcCl1COKBtO34/dfIcZrLD/YR3jJwIDAQAB', TOPIC = 'https://ntfy.sh/fl-sub-f11ebc9ad43b6dd3b99316cf';
+const u8 = b => { const s = atob(b.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - b.length % 4) % 4)); return Uint8Array.from(s, c => c.charCodeAt(0)); };
+const b64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const LSg = (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (_) { return d; } };
+let P = LSg('fl_push', { on: false, th: ['us-iran'], esc: true, sig: '', synced: 0 });
+const DEV = LSg('fl_dev', null) || (() => { const id = crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now(); localStorage.setItem('fl_dev', JSON.stringify(id)); return id; })();
+const pushOK = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+async function post(msg) {
+  const pub = await crypto.subtle.importKey('spki', u8(SPKI.replace(/\+/g, '-').replace(/\//g, '_')), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']); const iv = crypto.getRandomValues(new Uint8Array(12));
+  const c = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, new TextEncoder().encode(JSON.stringify(msg))); const k = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, pub, await crypto.subtle.exportKey('raw', key));
+  const r = await fetch(TOPIC, { method: 'POST', body: JSON.stringify({ v: 1, k: b64(k), iv: b64(iv), c: b64(c) }) }); if (!r.ok) throw new Error('relay ' + r.status);
+}
+const saveP = () => localStorage.setItem('fl_push', JSON.stringify(P));
+async function pushSync(force, test) {
+  if (!P.on || !pushOK() || Notification.permission !== 'granted') return; const reg = await navigator.serviceWorker.ready; let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: u8(VAPID) });
+  const s = sub.toJSON(); const sig = JSON.stringify([s.endpoint, P.th, P.esc]); if (!force && sig === P.sig && Date.now() - P.synced < 86400000) return;
+  await post({ id: DEV, sub: { endpoint: s.endpoint, keys: s.keys }, th: P.th, esc: P.esc, v: 4, test: !!test }); P.sig = sig; P.synced = Date.now(); saveP(); renderOpts();
+}
+function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 5200); }
+async function pushOn() { if (!pushOK()) { toast('This browser doesn’t support push notifications.'); return; } try { const perm = await Notification.requestPermission(); if (perm !== 'granted') { renderOpts(); return; } P.on = true; saveP(); await pushSync(true, true); toast('Alerts on. A confirmation push arrives with the next refresh (within ~15 min).'); } catch (e) { P.on = false; saveP(); toast('Could not turn on alerts: ' + (e.message || e)); } renderOpts(); }
+async function pushOff() { try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); await post({ id: DEV, off: true }); sub && await sub.unsubscribe(); } catch (_) { } P.on = false; P.sig = ''; saveP(); renderOpts(); }
+function sw(id, on, dis) { return `<button class="sw ${on ? 'on' : ''}" data-sw="${id}" role="switch" aria-checked="${on}" ${dis ? 'disabled' : ''}><i></i></button>`; }
+function renderOpts() {
+  const el = $('#optsBody'); if (!el || !S.TH) return; const perm = 'Notification' in window ? Notification.permission : 'unsupported';
+  const note = !pushOK() ? 'Push isn’t supported in this browser.' : perm === 'denied' ? 'Notifications are blocked for this site. Allow them in Chrome’s site settings.' : P.on ? `On. You’ll get major strikes, missile launches and escalation jumps for the conflicts ticked below, even when the app is closed. Max 4 an hour; quiet 00:30–07:30 UK unless severity 5. Delivered within ~15 min of a report.${P.synced ? ' Synced ' + hm(P.synced / 1000) + '.' : ''}` : 'Get notified about major events even when the app is closed.';
+  el.innerHTML = `<h3>ALERTS</h3><div class="orow"><span><b>Push alerts</b><small>${note}</small></span>${sw('push', P.on, !pushOK() || perm === 'denied')}</div>
+   ${Object.entries(S.TH).map(([id, t]) => `<div class="orow sub ${P.on ? '' : 'dim'}"><span>${esc(t.name)}</span>${sw('th:' + id, P.th.includes(id), !P.on)}</div>`).join('')}
+   <div class="orow sub ${P.on ? '' : 'dim'}"><span>Escalation jumps (meter reaches High or Severe)</span>${sw('esc', P.esc, !P.on)}</div>
+   ${P.on ? '<button class="obtn" id="pushTest">Send me a test alert</button>' : ''}
+   <h3>MAP LAYERS</h3>
+   <div class="orow"><span><b>Military aircraft (live ADS-B)</b><small>Public ADS-B/MLAT from adsb.lol, refreshed ~15 min</small></span>${sw('lay:air', LAY.air)}</div>
+   <div class="orow"><span><b>Naval positions (reported)</b><small>From news articles, with date and source. Placed at the named sea area, not live tracking</small></span>${sw('lay:naval', LAY.naval)}</div>
+   <div class="orow"><span><b>Bases & sites</b><small>Publicly known locations</small></span>${sw('lay:bases', LAY.bases)}</div>
+   <div class="orow"><span><b>Event pins</b><small>Reports from the last 24h</small></span>${sw('lay:pins', LAY.pins)}</div>
+   <div id="layInfo" class="prose small"></div>`;
+  renderLayerInfo();
+}
+$('#opts').addEventListener('click', async e => {
+  if (e.target.id === 'pushTest') { try { await pushSync(true, true); toast('Test requested. It arrives with the next refresh (within ~15 min).'); } catch (err) { toast('Failed: ' + err.message); } return; }
+  const b = e.target.closest('[data-sw]'); if (!b || b.disabled) return; const k = b.dataset.sw;
+  if (k === 'push') { P.on ? await pushOff() : await pushOn(); return; }
+  if (k.startsWith('th:')) { const id = k.slice(3); P.th = P.th.includes(id) ? P.th.filter(x => x !== id) : [...P.th, id]; saveP(); renderOpts(); pushSync(true).catch(() => { }); return; }
+  if (k === 'esc') { P.esc = !P.esc; saveP(); renderOpts(); pushSync(true).catch(() => { }); return; }
+  if (k.startsWith('lay:')) { const id = k.slice(4); LAY[id] = !LAY[id]; applyLayers(); renderOpts(); }
+});
+function openOpts() { $('#opts').classList.add('open'); $('#scrim').classList.add('on'); renderOpts(); }
+$('#fabOpts').addEventListener('click', openOpts);
+$('#fabBell').addEventListener('click', openOpts);
+// ---- breaking mode: full-screen code-made intro, then fly to the event
+const BRK_SEEN = new Set(LSg('fl_brk', []));
+function breaking(e, force) {
+  if (!force && (BRK_SEEN.has(e.id) || S.mode === 'scrub' || document.visibilityState !== 'visible')) { if (!force) { S.live = S.live || []; } return; }
+  BRK_SEEN.add(e.id); localStorage.setItem('fl_brk', JSON.stringify([...BRK_SEEN].slice(-200)));
+  const [nm, ic, col] = TY[e.type]; const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null; const P0 = evPos(e);
+  const where = P0.off ? cap(P0.where) + ' (off-map)' : P0.unk ? 'Location not stated' : cap(P0.where);
+  const words = esc(e.title).split(' ').map((w, i) => `<span style="animation-delay:${1.15 + i * .07}s">${w}</span>`).join(' ');
+  const el = $('#brk'); el.style.setProperty('--c', col);
+  el.innerHTML = `<div class="bk-scan"></div><div class="bk-grid"></div><div class="bk-radar"><i></i><b></b><em style="background:${side ? side.color : col}"></em></div>
+   <div class="bk-top"><span class="bk-live">● BREAKING</span><span>${esc(S.th.name.toUpperCase())}</span></div>
+   <div class="bk-mid"><div class="bk-kick"><span class="bk-ic">${ic}</span>${nm}${side ? ` <span class="bk-side" style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}</div>
+    <h1 class="bk-h">${words}</h1>
+    <div class="bk-meta"><span>📍 ${esc(where)}</span><span>${esc(e.outlet)}${(e.n || 1) > 1 ? ` +${e.n - 1} outlets` : ''}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div>
+    <div class="bk-sev">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= e.sev ? 'on' : ''}" style="animation-delay:${.9 + i * .08}s"></i>`).join('')}<span>SEVERITY ${e.sev}/5</span></div></div>
+   <div class="bk-foot">Symbolic visual of a reported event · tap to skip</div>`;
+  el.className = 'on'; vib([30, 40, 30]);
+  let done = false; const end = () => { if (done) return; done = true; el.className = 'on out'; setTimeout(() => { el.className = ''; el.innerHTML = ''; }, 700); S.userAt = -1e9; go(0); setTimeout(() => { play(e); S.nextAt = performance.now() + 6500; }, 350); };
+  el.onclick = end; setTimeout(end, RMQ.matches ? 1800 : 5200);
+}
+
 // ---------------------------------------------------------------- load
-function clearWorld() { for (const o of [...world.children]) if (o !== markers && o !== pinGroup) world.remove(o); markers.clear(); pinGroup.clear(); pins.clear(); fx.length = 0; labels.forEach(l => l.el.remove()); labels = []; if (terrain) { terrain.geometry.dispose(); terrain = null; } }
+function clearWorld() { for (const o of [...world.children]) if (o !== markers && o !== pinGroup && o !== liveG) world.remove(o); markers.clear(); pinGroup.clear(); pins.clear(); fx.length = 0; labels.forEach(l => l.el.remove()); labels = []; if (terrain) { terrain.geometry.dispose(); terrain = null; } }
 async function loadTheatre(tid) {
   if (!S.TH[tid]) tid = 'us-iran';
   $('#boot').classList.remove('gone');
@@ -519,8 +669,8 @@ async function loadTheatre(tid) {
   document.documentElement.style.setProperty('--A', S.th.sides[0].color); document.documentElement.style.setProperty('--B', S.th.sides[1].color);
   clearWorld();
   const [d] = await Promise.all([getJSON('data/' + tid + '.json').catch(() => ({ events: [] })), buildTerrain(tid, S.th)]);
-  buildMarkers(S.th); homeCam();
-  S.events = d.events || []; S.seen = new Set(S.events.map(e => e.id)); S.clusters = groupClusters(); S.live = [];
+  buildMarkers(S.th); homeCam(); liveG.clear(); loadExtras(true);
+  S.events = toLeads(d); S.seen = new Set(S.events.map(e => e.id)); S.clusters = groupClusters(); S.live = [];
   for (const c of S.clusters) { if (Date.now() / 1000 - c.lead.ts < 7 * 86400) dropPin(c.lead, evPos(c.lead)); }
   goLive(); S.nextAt = performance.now() + 1500;
   renderFeed();
@@ -530,9 +680,10 @@ async function poll() {
   try {
     S.index = await getJSON('data/index.json');
     const d = await getJSON('data/' + S.tid + '.json');
-    const fresh = (d.events || []).filter(e => !S.seen.has(e.id));
+    const all = toLeads(d); const fresh = all.filter(e => !S.seen.has(e.id));
+    loadExtras();
     if (fresh.length) {
-      S.events = d.events; fresh.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters();
+      S.events = all; fresh.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters();
       const leads = new Set(S.clusters.map(c => c.lead.id)); S.live.push(...fresh.filter(e => leads.has(e.id)).sort((a, b) => a.ts - b.ts));
       if (S.mode !== 'scrub') { metrics(Date.now() / 1000); buildQueue(); } renderFeed();
     }
@@ -574,10 +725,13 @@ async function init() {
   const h = (location.hash.match(/t=([\w-]+)/) || [])[1];
   await loadTheatre(h || localStorage.getItem('fl_t') || 'us-iran');
   go(DESK.matches ? 1 : 0); if (DESK.matches) { dockI = 0; bs.set(slotX(0)); }
+  applyLayers(); renderOpts(); pushSync(false).catch(() => { });
+  const he = (location.hash.match(/e=([\w-]+)/) || [])[1]; if (he) { const e = S.events.find(x => x.id === he); if (e) setTimeout(() => breaking(e, true), 600); }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { const m = ev.data || {}; if (m.type === 'open' && m.url) { const u = new URL(m.url); const t = (u.hash.match(/t=([\w-]+)/) || [])[1], e = (u.hash.match(/e=([\w-]+)/) || [])[1]; (t && t !== S.tid ? loadTheatre(t) : Promise.resolve()).then(() => { const ev2 = S.events.find(x => x.id === e); if (ev2) breaking(ev2, true); }); } if (m.type === 'pushed') poll(); });
   requestAnimationFrame(frame);
   setInterval(poll, 120000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') poll(); });
-  window.__fl = { S, play, go, flyTo, homeCam };
+  window.__fl = { S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground };
 }
 init().catch(err => { $('#boot span').textContent = 'Could not start: ' + err.message; console.error(err); });
 

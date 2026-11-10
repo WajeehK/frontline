@@ -291,6 +291,7 @@ def cluster(evs):
         for f in ('actor', 'atk', 'icp'):
             vals = [m.get(f) for m in ms if m.get(f)]
             c[f] = max(set(vals), key=vals.count) if vals else None
+        c['men'] = sorted(set(x for m in ms for x in (m.get('men') or [])))
         c['ts'] = min(m['ts'] for m in ms)
     out = []
     for c in cl:
@@ -301,7 +302,7 @@ def cluster(evs):
         outlets = []
         for m in ms:
             if not any(o['outlet'] == m['outlet'] for o in outlets): outlets.append({"outlet": m['outlet'], "url": m['url'], "title": m['title'], "ts": m['ts'], "via": m.get('via', 'RSS')})
-        out.append({"cid": cid, "ts": c['ts'], "last": ms[-1]['ts'], "type": c['type'], "sev": c['sev'], "actor": c['actor'], "atk": c['atk'], "icp": c['icp'],
+        out.append({"cid": cid, "ts": c['ts'], "last": ms[-1]['ts'], "type": c['type'], "sev": c['sev'], "actor": c['actor'], "atk": c['atk'], "icp": c['icp'], "men": c['men'],
                     "loc": c['loc'], "title": lead['title'], "url": lead['url'], "outlet": lead['outlet'], "n": len(ms), "outlets": outlets})
     return sorted(out, key=lambda c: -c['ts'])
 
@@ -328,6 +329,9 @@ def naval_reports(items, old):
                             "quote": sent.strip()[:220]}
     latest = {}
     for r in sorted(rep.values(), key=lambda r: r['ts']): latest[r['ship']] = r
+    names = list(latest)
+    for n in names:  # drop truncated names ("USS George" when "USS George Washington" exists)
+        if any(o != n and o.startswith(n + ' ') for o in names): latest.pop(n, None)
     return sorted(latest.values(), key=lambda r: -r['ts'])
 
 def main():
@@ -384,8 +388,9 @@ def main():
             elif typ in KINETIC:
                 atk = act or lnc or (('B' if tgt == 'A' else 'A') if tgt else None)
             if not act: act = atk if typ in KINETIC else None
+            men = sorted(side for side, pats in SIDE_ALIASES[tid].items() if any(re.search(*_alias_rx(p0)[:1], title, _alias_rx(p0)[1]) for p0 in pats))
             ev[eid] = {"id": eid, "ts": int(it['ts']), "title": title[:220], "desc": (it.get('desc') or '')[:220], "url": it['url'],
-                       "outlet": it['outlet'], "via": it.get('via', 'RSS'), "type": typ, "sev": sev, "actor": act, "atk": atk, "icp": icp, "loc": loc}
+                       "outlet": it['outlet'], "via": it.get('via', 'RSS'), "type": typ, "sev": sev, "actor": act, "atk": atk, "icp": icp, "men": men, "loc": loc}
         for e in ev.values(): e.pop('_re', None)
         evs = sorted(ev.values(), key=lambda e: -e['ts'])
         cls = cluster(evs)
