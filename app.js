@@ -126,8 +126,11 @@ async function buildTerrain(tid, th) {
 const labelsEl = $('#labels'); let labels = [];
 function addLabel(html, cls, p, pri, extra = {}) { const el = document.createElement('span'); el.className = cls; el.innerHTML = html; labelsEl.appendChild(el); const L = { el, p, pri, w: 0, h: 0, ...extra }; labels.push(L); return L; }
 const _v = new THREE.Vector3();
+let HUDB = 0; const _hudEl = document.getElementById('hud');
+function measureHud() { HUDB = _hudEl.getBoundingClientRect().bottom; document.documentElement.style.setProperty('--hudB', Math.round(HUDB) + 'px'); }
+new ResizeObserver(measureHud).observe(_hudEl); addEventListener('resize', measureHud); measureHud();
 function placeLabels() {
-  const W = innerWidth, H = innerHeight, placed = []; const hudB = Math.max($('#hud .meters').getBoundingClientRect().bottom, ($('#mkt')?.getBoundingClientRect().bottom) || 0);
+  const W = innerWidth, H = innerHeight, placed = []; const hudB = HUDB;
   const camD = camera.position.distanceTo(controls.target);
   const sorted = labels.slice().sort((a, b) => b.pri - a.pri);
   for (const L of sorted) {
@@ -138,6 +141,7 @@ function placeLabels() {
     let x = (_v.x * .5 + .5) * W - (L.ax ?? .5) * L.w, y = (-_v.y * .5 + .5) * H - (L.ay ?? .5) * L.h;
     if (L.force) { x = Math.max(8, Math.min(W - L.w - 8, x)); y = Math.max(hudB + 6, y); }
     else if (x < 2 || x + L.w > W - 2) show = false;
+    if (show && !L.force && y < hudB + 2) show = false; // never draw map labels under the HUD
     if (show && !L.force) for (const r of placed) if (x < r[2] && x + L.w > r[0] && y < r[3] && y + L.h > r[1]) { show = false; break; }
     if (show) { placed.push([x - 3, y - 2, x + L.w + 3, y + L.h + 2]); L.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0)`; }
     const op = show ? (L.op ?? 1) : 0; if (L._op !== op) { L.el.style.opacity = op; L._op = op; }
@@ -571,7 +575,9 @@ const fmtP = q => { const v = q.last; if (v == null) return '–'; const s = v >
 function renderMarkets() {
   const m = S.extras.mkt, el = $('#mkt'); if (!el) return;
   if (!m) { el.innerHTML = '<span class="mq dim">Markets unavailable</span>'; return; }
-  el.innerHTML = m.q.map(q => { const up = (q.ch || 0) >= 0; return `<span class="mq ${up ? 'up' : 'dn'}" title="${esc(q.name)} · ${esc(m.src)} · ${esc(hm(q.t))}"><b>${esc(q.name.replace('Lockheed Martin', 'LMT').replace('Northrop Grumman', 'NOC').replace('BAE Systems', 'BAE').replace('Dollar index', 'DXY'))}</b> ${fmtP(q)} <em>${q.ch == null ? '' : (up ? '▲' : '▼') + Math.abs(q.ch).toFixed(2) + '%'}</em>${spark(q.series)}</span>`; }).join('') + `<span class="mq dim">5-day · red lines = major reported strikes · ${esc(m.src)}</span>`;
+  const items = m.q.map(q => { const up = (q.ch || 0) >= 0; return `<span class="mq ${up ? 'up' : 'dn'}" title="${esc(q.name)} · ${esc(m.src)} · ${esc(hm(q.t))}"><b>${esc(q.name.replace('Lockheed Martin', 'LMT').replace('Northrop Grumman', 'NOC').replace('BAE Systems', 'BAE').replace('Dollar index', 'DXY'))}</b> ${fmtP(q)} <em>${q.ch == null ? '' : (up ? '▲' : '▼') + Math.abs(q.ch).toFixed(2) + '%'}</em>${spark(q.series)}</span>`; }).join('') + `<span class="mq dim">5-day · red lines = major reported strikes · ${esc(m.src)}</span>`;
+  el.innerHTML = `<div class="mkt-track"><div class="mkt-set">${items}</div><div class="mkt-set" aria-hidden="true">${items}</div></div>`;
+  requestAnimationFrame(() => { const t = el.querySelector('.mkt-set'); if (t) el.style.setProperty('--mdur', Math.max(18, t.offsetWidth / 32).toFixed(1) + 's'); });
 }
 // ---- sides scoreboard (counts of reported, classified incidents only)
 function renderSides() {
@@ -731,7 +737,8 @@ async function init() {
   requestAnimationFrame(frame);
   setInterval(poll, 120000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') poll(); });
-  window.__fl = { S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground };
+  $('#mkt').addEventListener('click', () => $('#mkt').classList.toggle('paused'));
+window.__fl = { S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground };
 }
 init().catch(err => { $('#boot span').textContent = 'Could not start: ' + err.message; console.error(err); });
 

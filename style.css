@@ -203,3 +203,31 @@ a{color:#9cc8ff}
 @media (prefers-reduced-motion:reduce){#brk *{animation:none!important}}
 @media (min-width:900px){#fabs{left:470px;right:auto;top:16px;flex-direction:row}.mkt{margin:0;padding:0}#sides.sheet,#opts.sheet{left:16px;right:auto;width:440px}.bk-mid{left:10vw;right:10vw}}
 #labels .co span{position:static;transform:none;opacity:1}
+
+/* ---------- v5: compact top area that fits 360–412px inside the safe area */
+.lbl{white-space:nowrap;overflow:hidden;gap:6px}.lbl>span:first-child{overflow:hidden;text-overflow:ellipsis}
+.tugsub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;gap:6px}.tugsub span{overflow:hidden;text-overflow:ellipsis}
+.esc .tugsub{margin-top:4px}
+.mkt{overflow:hidden;mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 22px),transparent);-webkit-mask-image:linear-gradient(90deg,transparent,#000 14px,#000 calc(100% - 22px),transparent);cursor:pointer}
+.mkt-track{display:flex;width:max-content;animation:mktRun var(--mdur,40s) linear infinite}
+.mkt-set{display:flex;gap:6px;padding-right:6px}
+.mkt.paused .mkt-track,.mkt:hover .mkt-track{animation-play-state:paused}
+@keyframes mktRun{to{transform:translate3d(-50%,0,0)}}
+@media (prefers-reduced-motion:reduce){.mkt{overflow-x:auto}.mkt-track{animation:none}.mkt-set[aria-hidden]{display:none}}
+#fabs{top:calc(var(--hudB,210px) + 10px)}
+@media (max-width:899px){
+ #hud{top:calc(6px + var(--safeT));left:calc(8px + env(safe-area-inset-left,0px));right:calc(8px + env(safe-area-inset-right,0px));gap:6px}
+ .brand{font-size:12px;letter-spacing:.2em;gap:7px}.brand img{width:24px;height:24px}
+ .chip{padding:6px 10px 6px 12px;font-size:13px}
+ .meters{gap:10px;padding:8px 10px 7px;border-radius:16px}
+ .lbl{font-size:9px;letter-spacing:.1em}
+ .escrow{margin:2px 0 4px;gap:6px}.escrow b{font-size:22px}.lvl{font-size:11px}
+ .tug{margin:5px 0 3px;font-size:10px}
+ .tugsub{font-size:9.5px}
+ .mkt{margin:0 -8px;padding:0 8px}
+ .mq{font-size:10px;padding:3px 7px;gap:4px}.mq svg{width:36px;height:12px}
+ .modechip{font-size:9px;padding:3px 9px;letter-spacing:.14em;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ #fabs{right:calc(8px + env(safe-area-inset-right,0px))}
+ .fab{width:38px;height:38px}
+}
+@media (max-width:370px){.brand b{letter-spacing:.14em}.meters{gap:8px;padding:7px 9px 6px}.escrow b{font-size:20px}}
