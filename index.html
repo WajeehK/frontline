@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
+<meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
+<title>Frontline · Live Conflict Tracker</title>
+<meta name="description" content="Live 3D conflict tracker: real news reports from public sources, mapped and animated on a 3D theatre map.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
+</head>
+<body>
+<canvas id="scene" aria-label="3D map of the conflict theatre"></canvas>
+<div id="labels" aria-hidden="true"></div>
+<div id="vign" aria-hidden="true"></div>
+
+<header id="hud">
+ <div class="row1">
+  <div class="brand"><img src="icons/icon-192.png" alt=""><b>FRONTLINE</b></div>
+  <button id="thBtn" class="glass chip" aria-haspopup="listbox"><span id="thName">US vs Iran</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+ </div>
+ <div class="glass meters">
+  <div class="esc">
+   <div class="lbl"><span>ESCALATION · 24H</span><span id="liveTag" class="live">● LIVE</span></div>
+   <div class="escrow"><b id="escN">–</b><span id="escL" class="lvl">–</span><span id="escSub" class="sub"></span></div>
+   <div class="gauge"><i id="escBar"></i><span class="tick" style="left:15%"></span><span class="tick" style="left:35%"></span><span class="tick" style="left:60%"></span><span class="tick" style="left:80%"></span></div>
+  </div>
+  <div class="front">
+   <div class="lbl"><span>FRONT LINE · 7D KINETIC PRESSURE</span></div>
+   <div class="tug"><span id="sideA" class="sa">–</span><div class="bar"><i id="tugA"></i><i id="tugB"></i><em id="tugM"></em></div><span id="sideB" class="sb">–</span></div>
+   <div class="tugsub"><span id="pA"></span><span id="pB"></span></div>
+  </div>
+ </div>
+ <div id="mode" class="modechip">REPLAY · LAST 48H</div>
+</header>
+
+<section id="ticker" class="glass" aria-live="polite"></section>
+<p id="note">Animations are symbolic of reported events, not real positions. <a href="#" id="noteMore">How it works</a></p>
+
+<aside id="feed" class="sheet glass" aria-label="Event feed">
+ <div class="grab"></div>
+ <div class="shead"><h2>Event feed</h2><div class="filters" role="tablist"><button data-f="all" class="on">All</button><button data-f="kin">Kinetic</button><button data-f="dip">Diplomacy</button><button data-f="oth">Other</button></div></div>
+ <div id="feedList" class="slist"></div>
+</aside>
+
+<section id="replay" class="glass" aria-label="Timeline">
+ <div class="rtop"><button id="rPlay" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button><div class="rtime"><b id="rWhen">–</b><span id="rInfo"></span></div><button id="rSpeed">1×</button><button id="rLive">LIVE</button></div>
+ <div class="rtrack"><canvas id="hist"></canvas><input id="rSlider" type="range" min="0" max="1000" value="1000" aria-label="Time"></div>
+ <div class="raxis"><span id="rStart"></span><span>drag to scrub · events replay as time passes</span><span>now</span></div>
+</section>
+
+<aside id="about" class="sheet glass" aria-label="About">
+ <div class="grab"></div>
+ <div class="slist prose" id="aboutBody"></div>
+</aside>
+
+<div id="thSheet" class="sheet glass small" role="listbox" aria-label="Choose conflict"><div class="grab"></div><div class="shead"><h2>Conflicts</h2></div><div id="thList" class="slist"></div></div>
+<div id="scrim"></div>
+<div id="boot"><img src="icons/icon-512.png" alt=""><span>Loading theatre…</span></div>
+<noscript>Frontline needs JavaScript and WebGL.</noscript>
+<script type="module" src="app.js"></script>
+</body>
+</html>
