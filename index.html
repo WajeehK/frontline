@@ -18,7 +18,7 @@
 <div id="labels" aria-hidden="true"></div>
 <div id="vign" aria-hidden="true"></div>
 
-<header id="hud">
+<header id="hud" class="loading">
  <div class="row1">
   <div class="brand"><img src="icons/icon-192.png" alt=""><b>FRONTLINE</b></div>
   <button id="thBtn" class="glass chip" aria-haspopup="listbox"><span id="thName">US vs Iran</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
@@ -51,7 +51,7 @@
 <aside id="feed" class="sheet glass" aria-label="Event feed">
  <div class="grab"></div>
  <div class="shead"><h2>Event feed</h2><div class="filters" role="tablist"><button data-f="all" class="on">All</button><button data-f="kin">Kinetic</button><button data-f="dip">Diplomacy</button><button data-f="oth">Other</button></div></div>
- <div id="feedList" class="slist"></div>
+ <div id="feedList" class="slist"><div class="skel"><i></i><i></i><i></i></div><div class="skel"><i></i><i></i><i></i></div><div class="skel"><i></i><i></i><i></i></div><div class="skel"><i></i><i></i><i></i></div></div>
 </aside>
 
 <section id="replay" class="glass" aria-label="Timeline">
@@ -60,9 +60,12 @@
  <div class="raxis"><span id="rStart"></span><span>drag to scrub · events replay as time passes</span><span>now</span></div>
 </section>
 
-<aside id="sides" class="sheet glass" aria-label="Sides scoreboard"><div class="grab"></div><div class="shead"><h2>Sides · reported events</h2></div><div id="sidesBody" class="slist"></div></aside>
+<aside id="sides" class="sheet glass" aria-label="Sides scoreboard"><div class="grab"></div><div class="shead"><h2>Sides · reported events</h2></div><div id="sidesBody" class="slist"><div class="skel"><i></i><i></i></div><div class="skel"><i></i><i></i></div><div class="skel"><i></i><i></i></div><div class="skel"><i></i><i></i></div></div></aside>
 <aside id="opts" class="sheet glass" aria-label="Layers and alerts"><div class="grab"></div><div class="shead"><h2>Alerts & layers</h2></div><div id="optsBody" class="slist prose"></div></aside>
 <div id="brk" aria-live="assertive"></div>
+<article id="story" class="sheet glass" aria-label="Story" aria-modal="true"></article>
+<div id="stbar" class="stbar"></div>
+<div id="wipe" aria-hidden="true"><b></b></div>
 <aside id="sentS" class="sheet glass small" aria-label="How sentiment is calculated"><div class="grab"></div><div class="shead"><h2>Sentiment · how it works</h2></div><div id="sentBody" class="slist prose"></div></aside>
 <aside id="about" class="sheet glass" aria-label="About">
  <div class="grab"></div>

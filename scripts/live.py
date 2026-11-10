@@ -119,7 +119,7 @@ def main():
                         eid, e = r2; tk = F.toks(e['title'])
                         if any(t == tid and len(tk & k) / max(1, len(tk | k)) >= 0.5 for t, k in known['toks']): continue  # already covered
                         e.update(cid='aj-' + eid, last=e['ts'], n=1, live=1, outlets=[{'outlet': name, 'url': e['url'], 'title': e['title'], 'ts': e['ts'], 'via': 'LIVE'}])
-                        e.pop('desc', None)
+                        e['desc'] = (e.get('desc') or '')[:280]
                         http('https://ntfy.sh/' + LIVE_TOPIC, data=json.dumps({'v': 1, 'tid': tid, 'e': e}).encode(), headers={'Title': 'frontline'}).read()
                         pub += 1; log('published', tid, e['type'], e['sev'], e['title'][:90])
                         if pusher: pushed += pusher.maybe_send(S, tid, e, th['name'])

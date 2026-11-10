@@ -125,7 +125,7 @@ async function buildTerrain(tid, th) {
   geo.setAttribute('elev', new THREE.BufferAttribute(elev, 1)); geo.computeVertexNormals();
   terrain = new THREE.Mesh(geo, terrMat); world.add(terrain);
   // borders
-  const pts = [];
+  S.borders = gj.borders; const pts = [];
   for (const L of gj.borders) for (let i = 0; i + 3 < L.length; i += 2) {
     const a = ground(L[i + 1], L[i], .012), b = ground(L[i + 3], L[i + 2], .012); pts.push(a, b);
   }
@@ -141,7 +141,7 @@ let HUDB = 0; const _hudEl = document.getElementById('hud');
 function measureHud() { HUDB = _hudEl.getBoundingClientRect().bottom; document.documentElement.style.setProperty('--hudB', Math.round(HUDB) + 'px'); }
 new ResizeObserver(measureHud).observe(_hudEl); addEventListener('resize', measureHud); measureHud();
 function placeLabels() {
-  const W = innerWidth, H = innerHeight, placed = []; const hudB = HUDB;
+  const W = innerWidth, H = innerHeight, placed = []; if ((placeLabels.n = (placeLabels.n || 0) + 1) % 15 === 0 || !HUDB) measureHud(); const hudB = HUDB;
   const camD = camera.position.distanceTo(controls.target);
   const sorted = labels.slice().sort((a, b) => b.pri - a.pri);
   for (const L of sorted) {
@@ -404,7 +404,7 @@ function metrics(T) {
   const PA = score(pa), PB = score(pb);
   const front = 50 + 40 * (PA - PB) / (PA + PB + 5);
   const lv = LV.find(l => e24 < l[0]);
-  $('#escN').textContent = e24; $('#escL').textContent = lv[1]; $('#escL').style.color = lv[2];
+  countTo($('#escN'), e24); $('#escL').textContent = lv[1]; $('#escL').style.color = lv[2];
   $('#escSub').textContent = `7d avg ${e7} ${e24 > e7 + 5 ? '↑' : e24 < e7 - 5 ? '↓' : '→'} · ${d1.length} reports`;
   $('#escBar').style.left = `calc(${e24}% - 1.5px)`;
   $('#tugA').style.width = front + '%'; $('#tugB').style.width = (100 - front) + '%'; $('#tugM').style.left = `calc(${front}% - 1px)`;
@@ -413,11 +413,12 @@ function metrics(T) {
 
 // ---------------------------------------------------------------- ticker + feed
 function ticker(e) {
+  S.tickE = e;
   const [nm, ic, col] = TY[e.type];
   const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
   $('#ticker').innerHTML = `<div class="ic" style="box-shadow:inset 0 0 0 1px ${col}55">${ic}</div><div class="tx"><a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
    <div class="mt">${e.live ? '<span class="lvb">● LIVE</span>' : ''}<span class="tag" style="color:${col}">${nm}</span>${side ? `<span style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}<span>${esc(e.outlet)}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div></div>`;
-  $('#ticker').classList.remove('hide');
+  $('#ticker').classList.remove('hide'); const tk = $('#ticker'); tk.classList.remove('tin'); void tk.offsetWidth; tk.classList.add('tin');
 }
 function toLeads(d) { if (d.clusters) return d.clusters.map(c => ({ ...c, id: c.cid, via: (c.outlets && c.outlets[0] || {}).via })); return d.events || []; }
 function groupClusters() { const m = new Map(); for (const e of S.events) { if (!m.has(e.cid)) m.set(e.cid, { lead: e, more: [] }); else m.get(e.cid).more.push(e); } return [...m.values()]; }
@@ -425,19 +426,21 @@ function renderFeed() {
   const f = S.filter; const T = S.mode === 'scrub' ? S.T : Infinity;
   const list = S.clusters.filter(c => c.lead.ts <= T).filter(c => f === 'all' || (f === 'kin' ? KIN.has(c.lead.type) : f === 'dip' ? c.lead.type === 'diplomacy' : !KIN.has(c.lead.type) && c.lead.type !== 'diplomacy'));
   $('#feedList').innerHTML = list.length ? list.slice(0, 150).map(c => { const e = c.lead; const [nm, ic, col] = TY[e.type]; const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
-    return `<div class="ev"><div class="h"><span class="tag" style="color:${col}">${ic} ${nm}</span>${e.live ? '<span class="lvb" title="From the Al Jazeera fast lane (checked every ~2 min)">● LIVE</span>' : ''}<span class="sev" style="color:${col}">${'●'.repeat(e.sev)}${'○'.repeat(5 - e.sev)}</span>${side ? `<span style="color:${side.color};font-weight:700">${esc(side.short)} ▸</span>` : ''}${e.loc ? `<span>📍 ${esc(cap(e.loc.name))}</span>` : ''}</div>
+    return `<div class="ev" data-id="${esc(e.id)}" role="button" tabindex="0"><div class="h"><span class="tag" style="color:${col}">${ic} ${nm}</span>${e.live ? '<span class="lvb" title="From the Al Jazeera fast lane (checked every ~2 min)">● LIVE</span>' : ''}<span class="sev" style="color:${col}">${'●'.repeat(e.sev)}${'○'.repeat(5 - e.sev)}</span>${side ? `<span style="color:${side.color};font-weight:700">${esc(side.short)} ▸</span>` : ''}${e.loc ? `<span>📍 ${esc(cap(e.loc.name))}</span>` : ''}</div>
     <a class="t" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
     <div class="m"><span>${esc(e.outlet)}${e.via === 'GDELT' ? ' (via GDELT)' : e.via === 'LIVE' ? ' · fast lane' : ''} · ${hm(e.ts)} · ${ago(e.ts)}</span><button data-id="${e.id}">Show on map ▸</button></div>
     ${(e.outlets || []).length > 1 ? `<details><summary>Covered by ${e.outlets.length} outlets: ${esc(e.outlets.map(o => o.outlet).join(', '))}</summary>${e.outlets.map(m => `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.outlet)} · ${hm(m.ts)} · ${esc(m.title)} ↗</a>`).join('')}</details>` : ''}</div>`; }).join('')
     : `<div class="empty">No reports in this filter yet. Data refreshes every ~15 minutes.</div>`;
 }
-$('#feedList').addEventListener('click', ev => { const b = ev.target.closest('button[data-id]'); if (!b) return; const e = S.events.find(x => x.id === b.dataset.id); if (!e) return; S.userAt = -1e9; if (!DESK.matches) go(0); setTimeout(() => play(e), 250); });
+$('#feedList').addEventListener('click', ev => { const card = ev.target.closest('.ev'); if (card && !ev.target.closest('button[data-id]') && !ev.target.closest('summary')) { ev.preventDefault(); const e = S.events.find(x => x.id === card.dataset.id); if (e) openStory(e); return; } const b = ev.target.closest('button[data-id]'); if (!b) return; const e = S.events.find(x => x.id === b.dataset.id); if (!e) return; S.userAt = -1e9; if (!DESK.matches) go(0); setTimeout(() => play(e), 250); });
 document.querySelectorAll('.filters button').forEach(b => b.addEventListener('click', () => { S.filter = b.dataset.f; document.querySelectorAll('.filters button').forEach(x => x.classList.toggle('on', x === b)); renderFeed(); }));
 
 // ---------------------------------------------------------------- sequencing: loop recent reports, animate new ones live
 function setMode(m) {
   S.mode = m; const mc = $('#mode');
   if (m === 'live') { mc.textContent = 'LIVE · NEW REPORT'; mc.className = 'modechip live'; }
+  else if (m === 'since') { mc.textContent = `SINCE YOUR LAST VISIT · ${S.queue.length} NEW`; mc.className = 'modechip since'; }
+  else if (m === 'loop' && S.queue.length <= 1) { mc.textContent = S.queue.length ? (S.firstVisit ? 'LATEST REPORT' : 'NOTHING NEW SINCE LAST VISIT · LATEST') : 'WATCHING FOR NEW REPORTS'; mc.className = 'modechip'; }
   else if (m === 'loop') { mc.textContent = `REPLAYING LAST ${S.loopH}H · ${S.queue.length} REPORTS`; mc.className = 'modechip'; }
   else { mc.textContent = 'TIMELINE · ' + hm(S.T); mc.className = 'modechip'; }
   $('#liveTag').textContent = m === 'scrub' ? '● REPLAY' : '● LIVE'; $('#liveTag').classList.toggle('replay', m === 'scrub');
@@ -452,6 +455,7 @@ function tick(now) {
   if (S.mode === 'scrub') { if (S.playing) { const step = (now - (S.lastT || now)) / 1000 * 3600 * (S.speed === 1 ? 1.5 : 6); const T0 = S.T; S.T = Math.min(Date.now() / 1000, S.T + step); for (const e of S.clusters.map(c => c.lead)) if (e.ts > T0 && e.ts <= S.T) play(e); scrubUI(); if (S.T >= Date.now() / 1000 - 60) togglePlay(false); } S.lastT = now; return; }
   if (S.live && S.live.length) { if (now > S.nextAt) { setMode('live'); const e = S.live.shift(); if (isMajor(e) && !BRK_SEEN.has(e.id) && Date.now() / 1000 - e.ts < 6 * 3600) { breaking(e); S.nextAt = now + 9000; } else { play(e); S.nextAt = now + 5200; } } return; }
   if (S.mode === 'live' && now > S.nextAt) setMode('loop');
+  if (S.once && S.qi >= S.queue.length) { if (S.queue.length && !S.doneAt) { S.doneAt = 1; markVisit(); if (S.since) { S.since = false; setMode('loop'); } } return; }
   if (S.queue.length && now > S.nextAt) { const e = S.queue[S.qi % S.queue.length]; S.qi++; play(e); S.nextAt = now + (KIN.has(e.type) ? 4600 : 3600); if (S.qi % S.queue.length === 0) S.nextAt += 2500; }
   if (!S.queue.length && now > S.nextAt) { $('#ticker').innerHTML = '<div class="tx"><span class="tt">No reports in the last 7 days for this theatre.</span></div>'; S.nextAt = now + 1e9; }
 }
@@ -474,7 +478,7 @@ function togglePlay(on) { S.playing = on ?? !S.playing; S.lastT = 0; $('#rPlay')
 $('#rPlay').addEventListener('click', () => { if (S.mode !== 'scrub' || S.T >= Date.now() / 1000 - 120) { S.T = span()[0]; scrubUI(); } togglePlay(); });
 $('#rSpeed').addEventListener('click', () => { S.speed = S.speed === 1 ? 4 : 1; $('#rSpeed').textContent = S.speed + '×'; });
 $('#rLive').addEventListener('click', goLive);
-function goLive() { togglePlay(false); S.T = null; buildQueue(); setMode('loop'); metrics(Date.now() / 1000); pinsAt(Date.now() / 1000); renderFeed(); slider.value = 1000; S.nextAt = 0; }
+function goLive(open) { togglePlay(false); S.T = null; if (open) openQueue(); else idleQueue(); setMode(S.since ? 'since' : 'loop'); metrics(Date.now() / 1000); pinsAt(Date.now() / 1000); renderFeed(); slider.value = 1000; S.nextAt = 0; }
 
 // ---------------------------------------------------------------- dock (liquid-glass spring pill, ported from Revise Shorts)
 const ICON = {
@@ -512,7 +516,7 @@ function mountDock() {
 }
 function go(i) {
   if (i === dockI && i !== 0) i = 0;
-  dockI = i; bs.set(slotX(i));
+  dockI = i; bs.set(slotX(i)); if (tbs) tbs.forEach((b, k) => b.setAttribute('aria-current', String(k === i)));
   document.body.classList.toggle('feedtab', i === 1);
   $('#feed').classList.toggle('open', i === 1 || DESK.matches);
   $('#about').classList.toggle('open', i === 4);
@@ -524,10 +528,10 @@ function go(i) {
   if (i === 1) renderFeed();
   if (i === 2) renderSides();
   if (i === 3) { requestAnimationFrame(drawHist); if (S.mode !== 'scrub') { S.T = Date.now() / 1000; scrubUI(); } }
-  if (i !== 3 && S.mode === 'scrub') goLive();
+  if (i !== 3 && S.mode === 'scrub') goLive(false);
   if (i === 4) renderAbout();
 }
-$('#scrim').addEventListener('click', () => { go(0); });
+$('#scrim').addEventListener('click', () => { if (storyOpen) { closeStory(); return; } go(0); });
 $('#noteMore').addEventListener('click', e => { e.preventDefault(); go(4); });
 
 // ---------------------------------------------------------------- theatre picker + about
@@ -610,19 +614,6 @@ function renderMarkets() {
   requestAnimationFrame(() => { const t = el.querySelector('.mkt-set'); if (t) el.style.setProperty('--mdur', Math.max(18, t.offsetWidth / 32).toFixed(1) + 's'); });
 }
 // ---- sides scoreboard (counts of reported, classified incidents only)
-function renderSides() {
-  const now = S.mode === 'scrub' ? S.T : Date.now() / 1000; const sd = S.th.sides;
-  const win = h => clustersIn(now - h * 3600, now);
-  const rows = [['Attacks reported', e => KIN.has(e.type) && !e.icp, 'atk'], ['Interceptions reported', e => !!e.icp, 'icp'], ['Diplomatic moves', e => e.type === 'diplomacy', 'men'], ['Deployments', e => e.type === 'deploy', 'men'], ['Threats & warnings', e => e.type === 'threat', 'men']];
-  const cnt = (es, f, fld, side) => es.filter(e => f(e) && (fld === 'men' ? (e.men || []).includes(side) : e[fld === 'atk' ? 'atk' : 'icp'] === side)).length;
-  const d1 = win(24), d7 = win(168);
-  const unat = d7.filter(e => KIN.has(e.type) && !e.atk && !e.icp).length;
-  $('#sidesBody').innerHTML = `<div class="sbh"><span style="color:${sd[0].color}">${esc(sd[0].name)}</span><span>24h · 7d</span><span style="color:${sd[1].color}">${esc(sd[1].name)}</span></div>` +
-    rows.map(([lab, f, fld]) => { const a1 = cnt(d1, f, fld, 'A'), a7 = cnt(d7, f, fld, 'A'), b1 = cnt(d1, f, fld, 'B'), b7 = cnt(d7, f, fld, 'B'); const tot = Math.max(1, a7 + b7);
-      return `<div class="sbr"><div class="sbl">${lab}</div><div class="sbv"><span class="na" style="color:${sd[0].color}"><b>${a1}</b> · ${a7}</span><div class="sbbar"><i style="width:${a7 / tot * 100}%;background:${sd[0].color}"></i><i style="width:${b7 / tot * 100}%;background:${sd[1].color}"></i></div><span class="nb" style="color:${sd[1].color}">${b1} · <b>${b7}</b></span></div></div>`; }).join('') +
-    `<p class="sbn">Big number = last 24h (left) / 7 days (right). These are <b>reported events</b>: news incidents grouped across outlets and classified by fixed keyword rules (who acted comes from the headline wording). They are not casualty, damage or battlefield-control figures. ${unat} kinetic reports in 7 days named no clear actor and aren’t counted for either side.</p>
-     <h3 class="sbh2">Most-covered incidents · 7d</h3>${d7.filter(e => KIN.has(e.type)).sort((a, b) => (b.n || 1) - (a.n || 1) || b.sev - a.sev).slice(0, 5).map(e => `<a class="sbi" href="${esc(e.url)}" target="_blank" rel="noopener"><span class="tag" style="color:${TY[e.type][2]}">${TY[e.type][0]}</span> ${esc(e.title)} <small>${e.n || 1} outlet${(e.n || 1) > 1 ? 's' : ''} · ${ago(e.ts)}</small></a>`).join('') || '<p class="sbn">No kinetic reports in 7 days.</p>'}`;
-}
 // ---- options sheet: layers + alerts
 const VAPID = 'BHOiDmI_WYfE7wK2yi1zyAQfG18afV7hl1-9dCvlBnpi_PRHsAB4RZPCwTlnDpbxlSKG9A9hsA7zTyXq1PWnCVk', SPKI = 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA/e0bYnNdyuxNqrZQaY7xk9Vf4t91ZQWKNDX81f0RyFuKn1otTPFKzMbEgoYcZbAYEVRU8KPqOJXnErFCK7l7A16Ha3I3NFBd2OcD8/biDGblsU5nxYX/NnqoO4IUnL7S6mS+zb7YIMCyi8M8AxQh1E5jaLZyl+mnUTSyFlR+XiDTbscYRKVDYshn/M7w91WIB4sMKdjNSzflKDAuCNdptmP3yX9ptGJWMDJA1bfTl2u7KXKGxdoubxcqgKztB6jO6H/QitLMs8vZQyJ4BkxYQAFixEOTBmCT2ZsT278gUfVhK8HdnKkYzbFnBRcCl1COKBtO34/dfIcZrLD/YR3jJwIDAQAB', TOPIC = 'https://ntfy.sh/fl-sub-f11ebc9ad43b6dd3b99316cf';
 const u8 = b => { const s = atob(b.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - b.length % 4) % 4)); return Uint8Array.from(s, c => c.charCodeAt(0)); };
@@ -699,7 +690,8 @@ function breaking(e, force) {
 function clearWorld() { for (const o of [...world.children]) if (o !== markers && o !== pinGroup && o !== liveG) world.remove(o); markers.clear(); pinGroup.clear(); pins.clear(); fx.length = 0; labels.forEach(l => l.el.remove()); labels = []; if (terrain) { terrain.geometry.dispose(); terrain = null; } }
 async function loadTheatre(tid) {
   if (!S.TH[tid]) tid = 'us-iran';
-  $('#boot').classList.remove('gone');
+  const firstLoad = !S.tid; if (!firstLoad && !RMQ.matches) { const w = $('#wipe'); w.querySelector('b').textContent = S.TH[tid].name; w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); } else $('#boot').classList.remove('gone');
+  if (S.tid && S.tid !== tid) markVisit();
   S.tid = tid; S.th = S.TH[tid]; localStorage.setItem('fl_t', tid);
   $('#thName').textContent = S.th.name; $('#sideA').textContent = S.th.sides[0].short; $('#sideB').textContent = S.th.sides[1].short;
   document.documentElement.style.setProperty('--A', S.th.sides[0].color); document.documentElement.style.setProperty('--B', S.th.sides[1].color);
@@ -709,9 +701,9 @@ async function loadTheatre(tid) {
   if (!RMQ.matches) { S.rise = performance.now(); world.scale.y = .02; }
   S.seen = new Set(); S.events = mergeFast(toLeads(d)); S.events.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters(); S.live = [];
   for (const c of S.clusters) { if (Date.now() / 1000 - c.lead.ts < 7 * 86400) dropPin(c.lead, evPos(c.lead)); }
-  goLive(); S.nextAt = performance.now() + 1500; renderSent();
+  goLive(true); S.nextAt = performance.now() + 1500; renderSent();
   renderFeed();
-  setTimeout(() => $('#boot').classList.add('gone'), 300);
+  setTimeout(() => { $('#boot').classList.add('gone'); $('#hud').classList.remove('loading'); }, 300);
 }
 
 
@@ -740,6 +732,160 @@ function openSent() {
   $('#sentS').classList.add('open'); $('#scrim').classList.add('on');
 }
 $('#sent').addEventListener('click', openSent);
+
+
+// ================================================================ v8
+// ---- open-app replay: only what is new since the last visit (per theatre), else a short look at the latest item
+const LV_KEY = t => 'fl_lv_' + t;
+function lastVisit(t) { const v = +localStorage.getItem(LV_KEY(t)); return v > 0 ? v : 0; }
+function markVisit() { if (S.tid) localStorage.setItem(LV_KEY(S.tid), String(Math.floor(Date.now() / 1000))); }
+function openQueue() {
+  const lv = lastVisit(S.tid); const leads = S.clusters.map(c => c.lead).sort((a, b) => a.ts - b.ts);
+  const fresh = lv ? leads.filter(e => e.ts > lv) : []; S.firstVisit = !lv;
+  S.once = true; S.qi = 0; S.doneAt = 0; S.loopH = 24;
+  if (fresh.length) { S.queue = fresh.slice(-24); S.since = true; }
+  else { S.queue = leads.length ? [leads[leads.length - 1]] : []; S.since = false; }
+}
+function idleQueue() { const leads = S.clusters.map(c => c.lead).sort((a, b) => a.ts - b.ts); S.queue = leads.length ? [leads[leads.length - 1]] : []; S.qi = S.queue.length; S.once = true; S.since = false; S.doneAt = 1; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') markVisit(); });
+addEventListener('pagehide', markVisit);
+
+// ---- sheets: one close path for every panel; handle tap + drag-down to close
+const TAB_SHEETS = { feed: 1, sides: 2, replay: 3, about: 4 };
+$('#ticker').addEventListener('click', ev => { if (!S.tickE) return; ev.preventDefault(); openStory(S.tickE); });
+function closeSheet(el) {
+  if (!el) return; if (el.id === 'story') { closeStory(); return; }
+  if (TAB_SHEETS[el.id] && !(DESK.matches && el.id === 'feed')) { if (dockI === TAB_SHEETS[el.id]) go(0); else el.classList.remove('open'); return; }
+  el.classList.remove('open'); if (!document.querySelector('.sheet.open:not(#feed)') || DESK.matches) $('#scrim').classList.remove('on');
+}
+function sheetDrag(el) {
+  const zones = el.querySelectorAll('.grab, .shead, .sthead'); let d = null;
+  zones.forEach(z => {
+    z.addEventListener('pointerdown', e => { if (e.button > 0 || e.target.closest('button:not(.grab), a, input')) return; d = { y: e.clientY, t: performance.now(), dy: 0, id: e.pointerId }; try { z.setPointerCapture(e.pointerId); } catch (_) { } el.classList.add('dragging'); });
+    z.addEventListener('pointermove', e => { if (!d || e.pointerId !== d.id) return; d.dy = Math.max(0, e.clientY - d.y); el.style.transform = `translate3d(0,${d.dy}px,0)`; });
+    const end = e => { if (!d) return; const { dy, t } = d; const tap = dy < 6 && performance.now() - t < 500; d = null; el.classList.remove('dragging'); el.style.transform = '';
+      if (e.type !== 'pointercancel' && (dy > 70 || tap && e.currentTarget.classList.contains('grab') || tap && e.currentTarget.classList.contains('shead') && e.target.closest('.grab'))) closeSheet(el); };
+    z.addEventListener('pointerup', end); z.addEventListener('pointercancel', end);
+    if (z.classList.contains('grab')) { z.setAttribute('role', 'button'); z.setAttribute('aria-label', 'Close panel'); z.tabIndex = 0; z.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); closeSheet(el); } }); }
+  });
+}
+document.querySelectorAll('.sheet').forEach(sheetDrag);
+addEventListener('keydown', e => { if (e.key === 'Escape') { const o = [...document.querySelectorAll('.sheet.open')].filter(x => !(DESK.matches && x.id === 'feed')).pop(); if (o) closeSheet(o); } });
+
+// ---- headline tone (same fixed lexicon as scripts/fetch.py)
+const ESC_RX = /\b(strikes?|struck|airstrikes?|attack(s|ed|ing)?|retaliat\w*|escalat\w*|missiles?|drones?|bomb\w*|kill(s|ed|ing)?|dead|deaths?|invad\w*|invasion|offensive|threat(s|en\w*)?|warn(s|ed|ing)?|war|wars|mobili[sz]\w*|shell(s|ed|ing)|assault\w*|raids?|clash(es|ed)?|revenge|ultimatum|seiz\w*|explosions?|blasts?|launch(es|ed)?|fire[sd]?|intercept\w*|casualt\w*|wounded|injur\w*|sanction\w*|hostil\w*|bombard\w*|siege)\b/gi;
+const DE_RX = /\b(talks?|ceasefire|cease-fire|truce|peace|negotiat\w*|deal|agreements?|diplomac\w*|diplomat\w*|dialogue|de-?escalat\w*|calm|restraint|releas\w*|exchanges?|humanitarian|aid|mediat\w*|summit|withdraw\w*|pause[sd]?|reopen\w*|accords?|envoys?|meet(s|ing)?|met|reconcil\w*|handover|resum\w*)\b/gi;
+const NEG_RX = /\b(reject\w*|collaps\w*|fail\w*|stall\w*|break(s|ing)? down|broke down|violat\w*|suspend\w*|walk(s|ed)? out|call(s|ed)? off|no deal|end(s|ed)? (the )?(truce|ceasefire))\b/i;
+function toneOf(t) { const E = (t.match(ESC_RX) || []), D = (t.match(DE_RX) || []); let e = E.length, d = D.length; if (d && NEG_RX.test(t)) { e += d; d = 0; } return e + d ? { v: (e - d) / (e + d), E, D } : null; }
+
+// ---- casualty figures: only when a headline/summary states a number (shown with its source, never summed)
+const CAS_RX = /\b(\d{1,3}(?:,\d{3})*|\d+)\s+(?:people\s+|civilians\s+|soldiers\s+|troops\s+|children\s+|palestinians\s+|israelis\s+|ukrainians\s+|russians\s+|iranians\s+|others\s+|fighters\s+|militants\s+|persons\s+)?(?:were\s+|are\s+|have been\s+)?(killed|dead|die[ds]?|wounded|injured|hurt)\b/i;
+const casOf = e => { for (const t of [e.title, e.desc || '']) { const m = t && t.match(CAS_RX); if (m) return { n: m[1], what: /kill|dead|die/i.test(m[2]) ? 'killed' : 'injured', text: m[0] }; } return null; };
+
+// ---- in-app story view
+let storyOpen = null;
+function related(e) {
+  const tk = new Set((e.title.toLowerCase().match(/[a-z0-9]{4,}/g) || []).filter(w => !['says', 'said', 'after', 'amid', 'with', 'from', 'over', 'that', 'this', 'their', 'will'].includes(w)));
+  return S.clusters.map(c => c.lead).filter(x => x.id !== e.id).map(x => { const t2 = (x.title.toLowerCase().match(/[a-z0-9]{4,}/g) || []); let sc = t2.filter(w => tk.has(w)).length;
+    if (e.loc && x.loc && e.loc.name === x.loc.name && e.loc.kind !== 'country') sc += 1.5; if (x.type === e.type) sc += .5; return [sc, x]; }).filter(([sc]) => sc >= 2.5).sort((a, b) => b[0] - a[0] || b[1].ts - a[1].ts).slice(0, 5).map(x => x[1]);
+}
+function miniMap(e) {
+  if (!S.borders || !BB) return ''; const kx = Math.cos(LATC * Math.PI / 180); const W = (BB[2] - BB[0]) * kx, H = BB[3] - BB[1];
+  const X = lon => ((lon - BB[0]) * kx).toFixed(2), Y = lat => (BB[3] - lat).toFixed(2);
+  const lines = S.borders.map(L => { let d = ''; for (let i = 0; i + 1 < L.length; i += 2) d += (i ? 'L' : 'M') + X(L[i]) + ' ' + Y(L[i + 1]); return d; }).join('');
+  const P = e.loc && e.loc.lat != null && inMap(e.loc.lat, e.loc.lon) ? `<circle class="mmp" cx="${X(e.loc.lon)}" cy="${Y(e.loc.lat)}" r="${(W / 60).toFixed(2)}"/><circle class="mmr" cx="${X(e.loc.lon)}" cy="${Y(e.loc.lat)}" r="${(W / 60).toFixed(2)}"/>` : '';
+  return `<svg class="mm" viewBox="0 0 ${W.toFixed(2)} ${H.toFixed(2)}" preserveAspectRatio="xMidYMid meet"><path d="${lines}" vector-effect="non-scaling-stroke"/>${P}</svg>`;
+}
+function storyHTML(e) {
+  const [nm, ic, col] = TY[e.type]; const sd = S.th.sides; const side = k => sd[k === 'A' ? 0 : 1];
+  const who = [e.atk ? `<span class="chip2" style="color:${side(e.atk).color}">${esc(side(e.atk).short)} ▸ acted</span>` : '', e.icp ? `<span class="chip2" style="color:${side(e.icp).color}">${esc(side(e.icp).short)} intercepted</span>` : '',
+    ...(e.men || []).filter(k => k !== e.atk && k !== e.icp).map(k => `<span class="chip2 dim" style="color:${side(k).color}">${esc(side(k).short)} mentioned</span>`)].join('');
+  const P = evPos(e); const where = P.off ? cap(P.where) + ' (off this map)' : P.unk ? 'Location not stated' : cap(P.where) + (P.approx ? ' (country-level)' : '');
+  const tn = toneOf(e.title); const tv = tn ? 50 + 50 * tn.v : 50; const cas = casOf(e);
+  const outs = (e.outlets && e.outlets.length ? e.outlets : [{ outlet: e.outlet, url: e.url, title: e.title, ts: e.ts, via: e.via }]);
+  const rel = related(e);
+  return `<div class="grab"></div>
+  <div class="sthead"><span class="tag" style="color:${col}">${ic} ${nm}</span>${e.live ? '<span class="lvb">● LIVE</span>' : ''}<span class="sev" style="color:${col}">${'●'.repeat(e.sev)}${'○'.repeat(5 - e.sev)}</span><button class="stx" aria-label="Close">✕</button></div>
+  <div class="stbody">
+   <h1 class="sth">${esc(e.title)}</h1>
+   <div class="stm"><span>${esc(e.outlet)}</span><span>${hm(e.ts)}</span><span>${ago(e.ts)}</span>${outs.length > 1 ? `<span>${outs.length} outlets</span>` : ''}</div>
+   ${who ? `<div class="stwho">${who}</div>` : ''}
+   ${e.desc ? `<p class="std">${esc(e.desc)}</p><p class="stsrc">Summary from the ${esc(e.outlet)} feed.</p>` : `<p class="stsrc">The feed gave no summary for this report.</p>`}
+   ${cas ? `<div class="stcas">Figure stated in this report: <b>${esc(cas.text)}</b> (${esc(e.outlet)}). Not independently verified.</div>` : ''}
+   <div class="stcard"><div class="stcl">WHERE</div><div class="stloc"><div class="mmw">${miniMap(e)}</div><div><b>${esc(where)}</b><small>Placed from place names in the headline. Animations are symbolic.</small><button class="obtn stfly">Show on map ▸</button></div></div></div>
+   <div class="stcard"><div class="stcl">HEADLINE TONE</div>${tn ? `<div class="srow"><span class="se">De-esc.</span><div class="sbar2"><em class="stn" style="left:${tv.toFixed(1)}%"></em></div><span class="se">Esc.</span></div><small>${tn.E.length ? 'Escalatory words: ' + esc([...new Set(tn.E.map(w => w.toLowerCase()))].join(', ')) + '. ' : ''}${tn.D.length ? 'De-escalatory: ' + esc([...new Set(tn.D.map(w => w.toLowerCase()))].join(', ')) + '.' : ''} Fixed word lists, same as the sentiment bar.</small>` : '<small>No words from either list in this headline.</small>'}</div>
+   <div class="stcard"><div class="stcl">COVERAGE · ${outs.length} OUTLET${outs.length > 1 ? 'S' : ''}</div>${outs.map(o => `<div class="sto"><b>${esc(o.outlet)}${o.via === 'GDELT' ? ' <i>via GDELT</i>' : o.via === 'LIVE' ? ' <i>fast lane</i>' : ''}</b><span>${esc(o.title || '')}</span><small>${hm(o.ts)} · ${ago(o.ts)} · <a href="${esc(o.url)}" target="_blank" rel="noopener">Read original ↗</a></small></div>`).join('')}</div>
+   ${rel.length ? `<div class="stcard"><div class="stcl">RELATED INCIDENTS</div>${rel.map(x => `<button class="strel" data-id="${esc(x.id)}"><span class="tag" style="color:${TY[x.type][2]}">${TY[x.type][1]} ${TY[x.type][0]}</span><b>${esc(x.title)}</b><small>${esc(x.outlet)} · ${ago(x.ts)}</small></button>`).join('')}</div>` : ''}
+   <p class="stnote">Frontline shows headlines and feed summaries only, with links to the original reporting.</p>
+  </div>
+`;
+}
+function openStory(e, push = true) {
+  if (!e) return; const el = $('#story'); storyOpen = e; el.innerHTML = storyHTML(e); el.scrollTop = 0; sheetDrag(el);
+  $('#stbar').innerHTML = `<button class="obtn stfly">Show on map</button><a class="obtn pri" href="${esc(e.url)}" target="_blank" rel="noopener">Read original at ${esc(e.outlet)} ↗</a>`;
+  requestAnimationFrame(() => { el.classList.add('open'); $('#stbar').classList.add('open'); }); document.body.classList.add('storyon');
+  if (push) history.pushState({ story: e.id }, '', location.pathname + location.search + '#t=' + S.tid + '&s=' + encodeURIComponent(e.id));
+  else history.replaceState({ story: e.id }, '', location.pathname + location.search + '#t=' + S.tid + '&s=' + encodeURIComponent(e.id));
+}
+function hideStory() { const el = $('#story'); el.classList.remove('open'); $('#stbar').classList.remove('open'); document.body.classList.remove('storyon'); storyOpen = null; }
+function closeStory() { if (history.state && history.state.story) history.back(); else { hideStory(); history.replaceState(null, '', location.pathname + location.search + '#t=' + S.tid); } }
+addEventListener('popstate', ev => { const id = ev.state && ev.state.story; if (id) { const e = S.events.find(x => x.id === id); if (e) openStory(e, false); } else if (storyOpen) hideStory(); });
+const storyClick = ev => {
+  if (ev.target.closest('.stx')) { closeStory(); return; }
+  if (ev.target.closest('.stfly')) { const e = storyOpen; closeStory(); setTimeout(() => { S.userAt = -1e9; go(0); play(e); }, 320); return; }
+  const r = ev.target.closest('.strel'); if (r) { const e = S.events.find(x => x.id === r.dataset.id); if (e) openStory(e, false); }
+};
+$('#story').addEventListener('click', storyClick); $('#stbar').addEventListener('click', storyClick);
+// the body (not only the handle) closes on a firm swipe down when scrolled to the top
+(() => { const el = $('#story'); let y0 = null, dy = 0; el.addEventListener('touchstart', e => { y0 = el.scrollTop <= 0 ? e.touches[0].clientY : null; dy = 0; }, { passive: true });
+  el.addEventListener('touchmove', e => { if (y0 == null) return; dy = e.touches[0].clientY - y0; if (dy > 0 && el.scrollTop <= 0) { el.classList.add('dragging'); el.style.transform = `translate3d(0,${dy * .9}px,0)`; } }, { passive: true });
+  el.addEventListener('touchend', () => { if (y0 == null) return; el.classList.remove('dragging'); el.style.transform = ''; if (dy > 110) closeStory(); y0 = null; }); })();
+
+// ---- count-up numbers
+function countUp(root) { if (RMQ.matches) return; root.querySelectorAll('[data-n]').forEach(el => { const to = +el.dataset.n; if (!(to > 0)) return; const st = performance.now(), dur = 650 + Math.min(500, to * 40);
+  const f = now => { const u = Math.min(1, (now - st) / dur); el.textContent = Math.round(to * (1 - (1 - u) ** 3)); if (u < 1) requestAnimationFrame(f); }; el.textContent = '0'; requestAnimationFrame(f); }); }
+function countTo(el, to) { if (RMQ.matches || !el) { if (el) el.textContent = to; return; } const from = +el.textContent || 0; if (from === to) { el.textContent = to; return; } const st = performance.now();
+  const f = now => { const u = Math.min(1, (now - st) / 800); el.textContent = Math.round(from + (to - from) * (1 - (1 - u) ** 3)); if (u < 1) requestAnimationFrame(f); }; requestAnimationFrame(f); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+
+// ---- sides scoreboard v8: clearer stats, each tappable to list the exact incidents
+const SB_ROWS = [
+  ['launched', 'Strikes launched', 'Missile, drone, air, naval or ground attacks this side is reported to have carried out.', e => KIN.has(e.type), 'atk'],
+  ['received', 'Strikes received', 'Attacks the other side is reported to have carried out against this side, including ones reported intercepted.', e => KIN.has(e.type), 'rcv'],
+  ['intercepted', 'Interceptions', 'Reports of this side shooting down or intercepting incoming missiles or drones.', e => !!e.icp, 'icp'],
+  ['cas', 'Casualty figures reported', 'Attacks by this side where the report itself states a number killed or injured. Figures are listed with their source, never added up.', e => KIN.has(e.type) && !!casOf(e), 'atk'],
+  ['diplo', 'Diplomatic moves', 'Talks, deals, ceasefire steps, envoys and meetings that name this side.', e => e.type === 'diplomacy', 'men'],
+  ['threat', 'Threats & statements', 'Warnings, threats and official statements that name this side.', e => e.type === 'threat' || e.type === 'statement', 'men'],
+  ['naval', 'Deployments & naval moves', 'Troop, ship or aircraft movements and naval incidents that name this side.', e => e.type === 'deploy' || e.type === 'naval', 'men'],
+];
+function sbMatch(row, e, side) { const [, , , f, fld] = row; if (!f(e)) return false; if (fld === 'men') return (e.men || []).includes(side); if (fld === 'rcv') return !!e.atk && e.atk !== side; return e[fld] === side; }
+function renderSides() {
+  const now = S.mode === 'scrub' ? S.T : Date.now() / 1000; const sd = S.th.sides;
+  const d1 = clustersIn(now - 86400, now), d7 = clustersIn(now - 7 * 86400, now);
+  const trend = (n1, n7) => { const avg = n7 / 7; if (!n7) return ['', '']; return n1 > avg * 1.5 + .5 ? ['up', '↑'] : n1 < avg * .5 - .25 ? ['dn', '↓'] : ['', '→']; };
+  const cell = (row, side) => { const n1 = d1.filter(e => sbMatch(row, e, side)).length, n7 = d7.filter(e => sbMatch(row, e, side)).length; const [tc, ta] = trend(n1, n7);
+    return { n1, n7, html: `<button class="sbc ${side}" data-row="${row[0]}" data-side="${side}" ${n7 ? '' : 'disabled'} aria-label="${esc(row[1])}, ${esc(sd[side === 'A' ? 0 : 1].name)}: ${n1} in 24 hours, ${n7} in 7 days"><b data-n="${n1}">${n1}</b><span>24h</span><i data-n="${n7}">${n7}</i><span>7d</span><em class="tr ${tc}" title="24h vs 7-day daily average">${ta}</em></button>` }; };
+  const unat = d7.filter(e => KIN.has(e.type) && !e.atk && !e.icp);
+  $('#sidesBody').innerHTML = `<div class="sbh"><span style="color:${sd[0].color}">${esc(sd[0].name)}</span><span>24h · 7d</span><span style="color:${sd[1].color}">${esc(sd[1].name)}</span></div>` +
+    `<p class="sbhint">Tap any number to see the exact reports behind it.</p>` + SB_ROWS.map(row => { const a = cell(row, 'A'), b = cell(row, 'B'); const tot = Math.max(1, a.n7 + b.n7);
+      return `<div class="sbr" data-row="${row[0]}"><div class="sbl">${row[1]}</div><div class="sbv">${a.html}<div class="sbbar"><i style="--w:${(a.n7 / tot * 100).toFixed(1)}%;background:${sd[0].color}"></i><i style="--w:${(b.n7 / tot * 100).toFixed(1)}%;background:${sd[1].color}"></i></div>${b.html}</div><div class="sbx">${row[2]} Last 24h and last 7 days.</div><div class="sbd"><div></div></div></div>`; }).join('') +
+    `<div class="sbr" data-row="unat"><div class="sbl">Attacks with no clear actor</div><div class="sbv one"><button class="sbc" data-row="unat" data-side="-" ${unat.length ? '' : 'disabled'}><b data-n="${d1.filter(e => KIN.has(e.type) && !e.atk && !e.icp).length}">0</b><span>24h</span><i data-n="${unat.length}">0</i><span>7d</span></button></div><div class="sbx">Kinetic reports whose headline doesn't say who acted. Not counted for either side.</div><div class="sbd"><div></div></div></div>` +
+    `<p class="sbn">All counts are <b>reported incidents</b>: news reports merged across outlets and sorted by fixed keyword rules, which can misread a headline. Tap any number to check the exact reports behind it. Trend arrows compare the last 24h with the 7-day daily average.</p>`;
+  countUp($('#sidesBody'));
+}
+function sbList(rowId, side) {
+  const now = S.mode === 'scrub' ? S.T : Date.now() / 1000; const d7 = clustersIn(now - 7 * 86400, now);
+  const row = SB_ROWS.find(r => r[0] === rowId); const list = (rowId === 'unat' ? d7.filter(e => KIN.has(e.type) && !e.atk && !e.icp) : d7.filter(e => sbMatch(row, e, side))).sort((a, b) => b.ts - a.ts);
+  return list.map((e, i) => { const [nm, ic, col] = TY[e.type]; const c = rowId === 'cas' ? casOf(e) : null;
+    return `<div class="sbitem" style="--i:${i}"><button class="sbo" data-id="${esc(e.id)}"><span class="tag" style="color:${col}">${ic} ${nm}</span>${now - e.ts < 86400 ? '<span class="n24">24h</span>' : ''}<b>${esc(e.title)}</b><small>${esc(e.outlet)}${(e.n || 1) > 1 ? ` +${e.n - 1}` : ''} · ${hm(e.ts)} · ${ago(e.ts)}</small>${c ? `<small class="cas">Stated: “${esc(c.text)}”</small>` : ''}</button><div class="sba"><button class="sbf" data-id="${esc(e.id)}">Map ▸</button><a href="${esc(e.url)}" target="_blank" rel="noopener">Original ↗</a></div></div>`; }).join('') || '<div class="empty">No reports.</div>';
+}
+$('#sidesBody').addEventListener('click', ev => {
+  const c = ev.target.closest('.sbc'); if (c) { const r = c.closest('.sbr'); const key = c.dataset.row + c.dataset.side; const open = r.classList.contains('open') && r.dataset.k === key;
+    $('#sidesBody').querySelectorAll('.sbr.open').forEach(x => { x.classList.remove('open'); x.querySelectorAll('.sbc').forEach(b => b.classList.remove('sel')); });
+    if (!open) { r.dataset.k = key; r.querySelector('.sbd>div').innerHTML = `<div class="sbdh">${c.dataset.side === '-' ? 'Unattributed attacks' : esc(S.th.sides[c.dataset.side === 'A' ? 0 : 1].name)} · ${esc(r.querySelector('.sbl').textContent)} · last 7 days</div>` + sbList(c.dataset.row, c.dataset.side); r.classList.add('open'); c.classList.add('sel'); setTimeout(() => r.scrollIntoView({ block: 'nearest', behavior: RMQ.matches ? 'auto' : 'smooth' }), 120); }
+    return; }
+  const o = ev.target.closest('.sbo'); if (o) { openStory(S.events.find(x => x.id === o.dataset.id)); return; }
+  const f = ev.target.closest('.sbf'); if (f) { const e = S.events.find(x => x.id === f.dataset.id); if (e) { S.userAt = -1e9; go(0); setTimeout(() => play(e), 250); } }
+});
 
 // ---- fast lane: Al Jazeera items published by the box poller (scripts/live.py) to a public ntfy topic, polled every minute
 const LIVE_TOPIC = 'fl-live-8143ad24bad1fb3ffba4'; S.fast = {};
@@ -824,6 +970,7 @@ async function init() {
   go(DESK.matches ? 1 : 0); if (DESK.matches) { dockI = 0; bs.set(slotX(0)); }
   applyLayers(); renderOpts(); pushSync(false).catch(() => { });
   await Promise.race([pollFast(), new Promise(r => setTimeout(r, 2500))]);
+  const hs = decodeURIComponent((location.hash.match(/s=([^&]+)/) || [])[1] || ''); if (hs) { const e = S.events.find(x => x.id === hs); if (e) { history.replaceState(null, '', location.pathname + location.search + '#t=' + S.tid); openStory(e); } }
   const he = (location.hash.match(/e=([\w-]+)/) || [])[1]; if (he) { const e = S.events.find(x => x.id === he); if (e) setTimeout(() => breaking(e, true), 600); }
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { const m = ev.data || {}; if (m.type === 'open' && m.url) { const u = new URL(m.url); const t = (u.hash.match(/t=([\w-]+)/) || [])[1], e = (u.hash.match(/e=([\w-]+)/) || [])[1]; (t && t !== S.tid ? loadTheatre(t) : Promise.resolve()).then(() => { const ev2 = S.events.find(x => x.id === e); if (ev2) breaking(ev2, true); }); } if (m.type === 'pushed') poll(); });
   requestAnimationFrame(frame);

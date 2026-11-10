@@ -259,6 +259,14 @@ def toks(s):
 def km(a, b):
     return 111 * math.hypot(a['lat'] - b['lat'], (a['lon'] - b['lon']) * math.cos(math.radians(a['lat'])))
 
+def summ(m):
+    """Feed summary without the repeated headline, trimmed (headline + summary only; never full articles)."""
+    d, t = (m.get('desc') or '').strip(), (m.get('title') or '').strip()
+    if d.lower().startswith(t.lower()[:40]): d = d[len(t):].strip(" -–—:|·")
+    for o in (m.get('outlet') or '',):
+        if o and d.lower().endswith(o.lower()): d = d[:-len(o)].strip(" -–—:|·")
+    return d[:280] if len(d) > 25 else ''
+
 def cluster(evs):
     """Group reports of the same incident: within 12h, compatible location, and similar headline."""
     cl = []
@@ -301,9 +309,10 @@ def cluster(evs):
         for m in ms: m['cid'] = cid
         outlets = []
         for m in ms:
-            if not any(o['outlet'] == m['outlet'] for o in outlets): outlets.append({"outlet": m['outlet'], "url": m['url'], "title": m['title'], "ts": m['ts'], "via": m.get('via', 'RSS')})
+            if not any(o['outlet'] == m['outlet'] for o in outlets): outlets.append({"outlet": m['outlet'], "url": m['url'], "title": m['title'], "ts": m['ts'], "via": m.get('via', 'RSS'), "desc": (m.get('desc') or '')[:200]})
         out.append({"cid": cid, "ts": c['ts'], "last": ms[-1]['ts'], "type": c['type'], "sev": c['sev'], "actor": c['actor'], "atk": c['atk'], "icp": c['icp'], "men": c['men'],
-                    "loc": c['loc'], "title": lead['title'], "url": lead['url'], "outlet": lead['outlet'], "n": len(ms), "outlets": outlets})
+                    "loc": c['loc'], "title": lead['title'], "url": lead['url'], "outlet": lead['outlet'], "n": len(ms), "outlets": outlets,
+                    "desc": next((d for d in (summ(m) for m in [lead] + ms) if d), '')})
     return sorted(out, key=lambda c: -c['ts'])
 
 def naval_reports(items, old):
