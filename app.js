@@ -386,7 +386,7 @@ function ticker(e) {
   const [nm, ic, col] = TY[e.type];
   const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
   $('#ticker').innerHTML = `<div class="ic" style="box-shadow:inset 0 0 0 1px ${col}55">${ic}</div><div class="tx"><a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
-   <div class="mt"><span class="tag" style="color:${col}">${nm}</span>${side ? `<span style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}<span>${esc(e.outlet)}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div></div>`;
+   <div class="mt">${e.live ? '<span class="lvb">● LIVE</span>' : ''}<span class="tag" style="color:${col}">${nm}</span>${side ? `<span style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}<span>${esc(e.outlet)}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div></div>`;
   $('#ticker').classList.remove('hide');
 }
 function toLeads(d) { if (d.clusters) return d.clusters.map(c => ({ ...c, id: c.cid, via: (c.outlets && c.outlets[0] || {}).via })); return d.events || []; }
@@ -395,9 +395,9 @@ function renderFeed() {
   const f = S.filter; const T = S.mode === 'scrub' ? S.T : Infinity;
   const list = S.clusters.filter(c => c.lead.ts <= T).filter(c => f === 'all' || (f === 'kin' ? KIN.has(c.lead.type) : f === 'dip' ? c.lead.type === 'diplomacy' : !KIN.has(c.lead.type) && c.lead.type !== 'diplomacy'));
   $('#feedList').innerHTML = list.length ? list.slice(0, 150).map(c => { const e = c.lead; const [nm, ic, col] = TY[e.type]; const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
-    return `<div class="ev"><div class="h"><span class="tag" style="color:${col}">${ic} ${nm}</span><span class="sev" style="color:${col}">${'●'.repeat(e.sev)}${'○'.repeat(5 - e.sev)}</span>${side ? `<span style="color:${side.color};font-weight:700">${esc(side.short)} ▸</span>` : ''}${e.loc ? `<span>📍 ${esc(cap(e.loc.name))}</span>` : ''}</div>
+    return `<div class="ev"><div class="h"><span class="tag" style="color:${col}">${ic} ${nm}</span>${e.live ? '<span class="lvb" title="From the Al Jazeera fast lane (checked every ~2 min)">● LIVE</span>' : ''}<span class="sev" style="color:${col}">${'●'.repeat(e.sev)}${'○'.repeat(5 - e.sev)}</span>${side ? `<span style="color:${side.color};font-weight:700">${esc(side.short)} ▸</span>` : ''}${e.loc ? `<span>📍 ${esc(cap(e.loc.name))}</span>` : ''}</div>
     <a class="t" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
-    <div class="m"><span>${esc(e.outlet)}${e.via === 'GDELT' ? ' (via GDELT)' : ''} · ${hm(e.ts)} · ${ago(e.ts)}</span><button data-id="${e.id}">Show on map ▸</button></div>
+    <div class="m"><span>${esc(e.outlet)}${e.via === 'GDELT' ? ' (via GDELT)' : e.via === 'LIVE' ? ' · fast lane' : ''} · ${hm(e.ts)} · ${ago(e.ts)}</span><button data-id="${e.id}">Show on map ▸</button></div>
     ${(e.outlets || []).length > 1 ? `<details><summary>Covered by ${e.outlets.length} outlets: ${esc(e.outlets.map(o => o.outlet).join(', '))}</summary>${e.outlets.map(m => `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.outlet)} · ${hm(m.ts)} · ${esc(m.title)} ↗</a>`).join('')}</details>` : ''}</div>`; }).join('')
     : `<div class="empty">No reports in this filter yet. Data refreshes every ~15 minutes.</div>`;
 }
@@ -676,17 +676,41 @@ async function loadTheatre(tid) {
   clearWorld();
   const [d] = await Promise.all([getJSON('data/' + tid + '.json').catch(() => ({ events: [] })), buildTerrain(tid, S.th)]);
   buildMarkers(S.th); homeCam(); liveG.clear(); loadExtras(true);
-  S.events = toLeads(d); S.seen = new Set(S.events.map(e => e.id)); S.clusters = groupClusters(); S.live = [];
+  S.seen = new Set(); S.events = mergeFast(toLeads(d)); S.events.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters(); S.live = [];
   for (const c of S.clusters) { if (Date.now() / 1000 - c.lead.ts < 7 * 86400) dropPin(c.lead, evPos(c.lead)); }
   goLive(); S.nextAt = performance.now() + 1500;
   renderFeed();
   setTimeout(() => $('#boot').classList.add('gone'), 300);
 }
+
+// ---- fast lane: Al Jazeera items published by the box poller (scripts/live.py) to a public ntfy topic, polled every minute
+const LIVE_TOPIC = 'fl-live-8143ad24bad1fb3ffba4'; S.fast = {};
+const nurl = u => { try { const x = new URL(u); return (x.protocol + '//' + x.host.toLowerCase() + x.pathname.replace(/\/+$/, '')); } catch (_) { return u; } };
+function mergeFast(all) {
+  const fast = Object.values(S.fast[S.tid] || {}); if (!fast.length) return all;
+  const byUrl = new Map(fast.map(e => [nurl(e.url), e]));
+  for (const c of all) for (const o of (c.outlets || [])) { const f = byUrl.get(nurl(o.url)); if (f) { c.live = 1; if (S.seen && S.seen.has(f.cid)) S.seen.add(c.id); byUrl.delete(nurl(o.url)); } }
+  const extra = [...byUrl.values()].map(e => ({ ...e, id: e.cid, via: 'LIVE' }));
+  return extra.length ? [...extra, ...all].sort((a, b) => b.ts - a.ts) : all;
+}
+async function pollFast() {
+  try {
+    const r = await fetch('https://ntfy.sh/' + LIVE_TOPIC + '/json?poll=1&since=6h', { cache: 'no-store' }); if (!r.ok) return;
+    let got = 0;
+    for (const ln of (await r.text()).split('\n')) { try { const m = JSON.parse(ln); if (m.event !== 'message') continue; const x = JSON.parse(m.message); if (!x || !x.e || !x.tid || !S.TH[x.tid]) continue; const b = S.fast[x.tid] = S.fast[x.tid] || {}; if (!b[x.e.cid]) { b[x.e.cid] = x.e; if (x.tid === S.tid) got++; } } catch (_) { } }
+    S.fastAt = Date.now();
+    if (got && S.events) {
+      const all = mergeFast(S.events.filter(e => e.via !== 'LIVE')); const fresh = all.filter(e => !S.seen.has(e.id));
+      S.events = all; fresh.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters();
+      S.live.push(...fresh.sort((a, b) => a.ts - b.ts)); if (S.mode !== 'scrub') { metrics(Date.now() / 1000); buildQueue(); } renderFeed();
+    }
+  } catch (_) { }
+}
 async function poll() {
   try {
     S.index = await getJSON('data/index.json');
     const d = await getJSON('data/' + S.tid + '.json');
-    const all = toLeads(d); const fresh = all.filter(e => !S.seen.has(e.id));
+    const all = mergeFast(toLeads(d)); const fresh = all.filter(e => !S.seen.has(e.id));
     loadExtras();
     if (fresh.length) {
       S.events = all; fresh.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters();
@@ -732,11 +756,12 @@ async function init() {
   await loadTheatre(h || localStorage.getItem('fl_t') || 'us-iran');
   go(DESK.matches ? 1 : 0); if (DESK.matches) { dockI = 0; bs.set(slotX(0)); }
   applyLayers(); renderOpts(); pushSync(false).catch(() => { });
+  await Promise.race([pollFast(), new Promise(r => setTimeout(r, 2500))]);
   const he = (location.hash.match(/e=([\w-]+)/) || [])[1]; if (he) { const e = S.events.find(x => x.id === he); if (e) setTimeout(() => breaking(e, true), 600); }
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { const m = ev.data || {}; if (m.type === 'open' && m.url) { const u = new URL(m.url); const t = (u.hash.match(/t=([\w-]+)/) || [])[1], e = (u.hash.match(/e=([\w-]+)/) || [])[1]; (t && t !== S.tid ? loadTheatre(t) : Promise.resolve()).then(() => { const ev2 = S.events.find(x => x.id === e); if (ev2) breaking(ev2, true); }); } if (m.type === 'pushed') poll(); });
   requestAnimationFrame(frame);
-  setInterval(poll, 120000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') poll(); });
+  setInterval(poll, 120000); setInterval(() => { if (document.visibilityState === 'visible') pollFast(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { poll(); pollFast(); } });
   $('#mkt').addEventListener('click', () => $('#mkt').classList.toggle('paused'));
 window.__fl = { S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground };
 }

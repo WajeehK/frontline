@@ -334,6 +334,32 @@ def naval_reports(items, old):
         if any(o != n and o.startswith(n + ' ') for o in names): latest.pop(n, None)
     return sorted(latest.values(), key=lambda r: -r['ts'])
 
+def make_event(tid, it):
+    """One feed item -> (eid, event) for a theatre; event None = drop; returns None when irrelevant. Shared by live.py."""
+    title = it['title']
+    if SKIP.search(title): return None
+    if NATURAL.search(title) and not KINETIC_STRONG.search(title): return None
+    if not relevant(tid, title): return None
+    nu = norm_url(it['url']); eid = hashlib.sha1(nu.encode()).hexdigest()[:12]
+    typ, sev = classify(title, it.get('desc', ''))
+    if not typ: return eid, None
+    loc = geocode(tid, title, it.get('desc', ''), typ in KINETIC)
+    act = actor(tid, title); lnc = launcher(tid, title)
+    tgt = owner(tid, loc)
+    icp = None; atk = None
+    if INTERCEPT.search(title) and typ in KINETIC:
+        ic = interceptor(tid, title)
+        if lnc and lnc != ic: atk = lnc; icp = ic or ('B' if lnc == 'A' else 'A')
+        elif ic: icp = ic; atk = 'B' if ic == 'A' else 'A'
+        elif act: atk = act; icp = 'B' if act == 'A' else 'A'
+        elif tgt: icp = tgt; atk = 'B' if tgt == 'A' else 'A'
+    elif typ in KINETIC:
+        atk = act or lnc or (('B' if tgt == 'A' else 'A') if tgt else None)
+    if not act: act = atk if typ in KINETIC else None
+    men = sorted(side for side, pats in SIDE_ALIASES[tid].items() if any(re.search(*_alias_rx(p0)[:1], title, _alias_rx(p0)[1]) for p0 in pats))
+    return eid, {"id": eid, "ts": int(it['ts']), "title": title[:220], "desc": (it.get('desc') or '')[:220], "url": it['url'],
+               "outlet": it['outlet'], "via": it.get('via', 'RSS'), "type": typ, "sev": sev, "actor": act, "atk": atk, "icp": icp, "men": men, "loc": loc}
+
 def main():
     items, status = [], []
     for name, url in FEEDS:
@@ -367,30 +393,13 @@ def main():
             for e in ev.values(): e['_re'] = True
         for it in list(items) + [dict(e, desc=e.get('desc', '')) for e in ev.values() if e.get('_re')]:
             if it['ts'] > NOW + 600 or it['ts'] < NOW - KEEP_DAYS * 86400: continue
-            title = it['title']
-            if SKIP.search(title): continue
-            if NATURAL.search(title) and not KINETIC_STRONG.search(title): continue
-            if not relevant(tid, title): continue
-            nu = norm_url(it['url']); eid = hashlib.sha1(nu.encode()).hexdigest()[:12]
-            if eid in ev and not ev[eid].get('_re'): continue
-            typ, sev = classify(title, it.get('desc', ''))
-            if not typ: ev.pop(eid, None); continue
-            loc = geocode(tid, title, it.get('desc', ''), typ in KINETIC)
-            act = actor(tid, title); lnc = launcher(tid, title)
-            tgt = owner(tid, loc)
-            icp = None; atk = None
-            if INTERCEPT.search(title) and typ in KINETIC:
-                ic = interceptor(tid, title)
-                if lnc and lnc != ic: atk = lnc; icp = ic or ('B' if lnc == 'A' else 'A')
-                elif ic: icp = ic; atk = 'B' if ic == 'A' else 'A'
-                elif act: atk = act; icp = 'B' if act == 'A' else 'A'
-                elif tgt: icp = tgt; atk = 'B' if tgt == 'A' else 'A'
-            elif typ in KINETIC:
-                atk = act or lnc or (('B' if tgt == 'A' else 'A') if tgt else None)
-            if not act: act = atk if typ in KINETIC else None
-            men = sorted(side for side, pats in SIDE_ALIASES[tid].items() if any(re.search(*_alias_rx(p0)[:1], title, _alias_rx(p0)[1]) for p0 in pats))
-            ev[eid] = {"id": eid, "ts": int(it['ts']), "title": title[:220], "desc": (it.get('desc') or '')[:220], "url": it['url'],
-                       "outlet": it['outlet'], "via": it.get('via', 'RSS'), "type": typ, "sev": sev, "actor": act, "atk": atk, "icp": icp, "men": men, "loc": loc}
+            nu = norm_url(it['url']); eid0 = hashlib.sha1(nu.encode()).hexdigest()[:12]
+            if eid0 in ev and not ev[eid0].get('_re'): continue
+            r = make_event(tid, it)
+            if r is None: continue
+            eid, e1 = r
+            if e1 is None: ev.pop(eid, None)
+            else: ev[eid] = e1
         for e in ev.values(): e.pop('_re', None)
         evs = sorted(ev.values(), key=lambda e: -e['ts'])
         cls = cluster(evs)
