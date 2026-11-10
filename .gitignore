@@ -1,2 +1,6 @@
 shots/
 __pycache__/
+data/markets.json
+data/aircraft.json
+data/naval.json
+data/push.bin

@@ -10,7 +10,8 @@ G = [
  (["kish island"],26.53,53.98,"place"),(["abu musa"],25.87,55.03,"place"),(["tunb"],26.26,55.31,"place"),(["semnan"],35.58,53.39,"place"),
  (["yazd"],31.9,54.37,"place"),(["kerman"],30.28,57.08,"place"),(["urmia"],37.55,45.08,"place"),(["dezful"],32.38,48.4,"place"),
  (["south pars","asaluyeh"],27.48,52.61,"place"),(["strait of hormuz","hormuz"],26.57,56.25,"sea"),(["gulf of oman"],24.5,58.5,"sea"),
- (["persian gulf"],27.0,51.5,"sea"),(["arabian sea"],17.0,62.0,"sea"),(["tehran"],35.69,51.39,"metro"),(["iran"],32.4,54.5,"country"),
+ (["eastern mediterranean","eastern med"],33.9,32.6,"sea"),(["mediterranean"],34.2,31.0,"sea"),(["north arabian sea","northern arabian sea"],21.5,63.0,"sea"),
+ (["gulf of aqaba"],28.6,34.75,"sea"),(["suez canal"],30.6,32.33,"place"),(["indian ocean"],5.0,70.0,"off"),(["persian gulf","arabian gulf"],27.0,51.5,"sea"),(["arabian sea"],17.0,62.0,"sea"),(["tehran"],35.69,51.39,"metro"),(["iran"],32.4,54.5,"country"),
  # --- Gulf, Iraq, Levant hosts
  (["al udeid"],25.117,51.315,"place"),(["doha"],25.29,51.53,"place"),(["qatar"],25.3,51.2,"country"),(["bahrain","manama"],26.22,50.58,"place"),
  (["camp arifjan"],28.876,48.155,"place"),(["kuwait"],29.37,47.98,"country"),(["abu dhabi"],24.45,54.38,"place"),(["dubai"],25.2,55.27,"place"),
@@ -50,7 +51,8 @@ G = [
  (["krasnodar"],45.04,38.98,"place"),(["voronezh"],51.66,39.2,"place"),(["engels"],51.48,46.21,"place"),(["saratov"],51.53,46.03,"place"),(["tuapse"],44.1,39.07,"place"),
  (["taganrog"],47.21,38.94,"place"),(["volgograd"],48.71,44.51,"place"),(["kaluga"],54.51,36.25,"place"),(["tula"],54.19,37.62,"place"),(["oryol"],52.97,36.07,"place"),
  (["lipetsk"],52.61,39.59,"place"),(["tambov"],52.72,41.45,"place"),(["ryazan"],54.63,39.74,"place"),(["smolensk"],54.78,32.05,"place"),(["yeysk"],46.71,38.27,"place"),
- (["sochi"],43.6,39.73,"place"),(["black sea"],44.0,34.0,"sea"),(["sea of azov"],46.2,36.6,"sea"),(["minsk"],53.9,27.56,"place"),(["moscow"],55.76,37.62,"metro"),(["russia"],54.0,42.0,"country"),
+ (["sochi"],43.6,39.73,"place"),(["black sea"],44.0,34.0,"sea"),(["sea of azov"],46.2,36.6,"sea"),(["nizhny novgorod"],56.33,44.0,"place"),(["novgorod"],58.52,31.27,"place"),(["st petersburg","saint petersburg","st. petersburg"],59.94,30.31,"place"),(["yaroslavl"],57.63,39.87,"place"),
+ (["kazan"],55.79,49.12,"place"),(["samara"],53.2,50.15,"place"),(["leningrad oblast"],59.6,30.5,"place"),(["murmansk"],68.97,33.08,"place"),(["minsk"],53.9,27.56,"place"),(["moscow"],55.76,37.62,"metro"),(["russia"],54.0,42.0,"country"),
  # --- off-map
  (["mildenhall"],52.36,0.49,"off"),(["lakenheath"],52.41,0.56,"off"),(["fairford"],51.68,-1.79,"off"),(["diego garcia"],-7.31,72.41,"off"),
  (["uk base","uk bases","uk airbase","uk air base","britain","united kingdom","raf"],52.0,-1.0,"off"),(["geneva"],46.2,6.14,"off"),(["vienna"],48.2,16.37,"off"),(["brussels"],50.85,4.35,"off"),(["istanbul"],41.01,28.98,"off"),(["beijing"],39.9,116.4,"off"),
