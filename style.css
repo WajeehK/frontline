@@ -372,3 +372,21 @@ button,.chip,.fab,.mq{transition:transform .14s cubic-bezier(.3,1.5,.5,1)}
 .sbhint{font-size:10.5px;color:rgba(235,238,242,.5);margin:-2px 0 6px;text-align:center}
 .sbv .sbc.A{padding-right:20px}.sbv .sbc.B{padding-left:20px}
 .sbh{gap:8px}
+
+/* ---------- v8.1: collapsible HUD */
+#hud{transition:transform .55s cubic-bezier(.2,1.1,.3,1),opacity .35s}
+body.hudc #hud{transform:translate3d(0,calc(-100% - 14px - var(--safeT)),0);opacity:0;pointer-events:none}
+body.hudc #hud>*{pointer-events:none}
+.hudtog{align-self:center;width:46px;height:16px;margin-top:-3px;display:grid;place-items:center;border:0;border-radius:999px;background:rgba(0,0,0,.4);border:.5px solid rgba(255,255,255,.12);color:#fff;padding:0}
+.hudtog svg,.hudtab svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.hudtog:active{transform:scale(.9)}
+.hudtab{position:fixed;z-index:12;left:50%;top:calc(6px + var(--safeT));transform:translate3d(-50%,calc(-100% - 20px - var(--safeT)),0);display:flex;align-items:center;gap:6px;padding:5px 10px 5px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.06em;color:#fff;touch-action:none;transition:transform .5s cubic-bezier(.2,1.3,.3,1) .05s;max-width:calc(100% - 24px);white-space:nowrap}
+.hudtab span{overflow:hidden;text-overflow:ellipsis}
+body.hudc .hudtab{transform:translate3d(-50%,0,0)}
+body.hudc .hudtab:active{transform:translate3d(-50%,2px,0) scale(.97)}
+#brkMini{position:fixed;z-index:44;left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));top:calc(46px + var(--safeT));padding:10px 12px;border-radius:16px;background:rgba(20,8,6,.82);border:.5px solid rgba(255,90,60,.5);box-shadow:0 10px 30px rgba(0,0,0,.5),0 0 24px rgba(255,60,30,.25);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);transform:translate3d(0,calc(-100% - 70px - var(--safeT)),0);transition:transform .55s cubic-bezier(.2,1.25,.3,1);cursor:pointer}
+#brkMini.on{transform:none}
+#brkMini .bmk{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.14em;color:#fff;padding:2px 8px;border-radius:999px;animation:lvbP 1.2s ease-in-out infinite}
+#brkMini b{display:block;font-size:13.5px;line-height:1.3;margin:5px 0 3px}#brkMini small{font-size:10.5px;color:var(--dim)}
+@media (min-width:900px){body.hudc #hud{transform:translate3d(0,calc(-100% - 30px),0)}#brkMini{left:16px;right:auto;width:440px}}
+@media (prefers-reduced-motion:reduce){#hud,.hudtab,#brkMini{transition:none}}

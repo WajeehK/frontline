@@ -138,7 +138,7 @@ const labelsEl = $('#labels'); let labels = [];
 function addLabel(html, cls, p, pri, extra = {}) { const el = document.createElement('span'); el.className = cls; el.innerHTML = html; labelsEl.appendChild(el); const L = { el, p, pri, w: 0, h: 0, ...extra }; labels.push(L); return L; }
 const _v = new THREE.Vector3();
 let HUDB = 0; const _hudEl = document.getElementById('hud');
-function measureHud() { HUDB = _hudEl.getBoundingClientRect().bottom; document.documentElement.style.setProperty('--hudB', Math.round(HUDB) + 'px'); }
+function measureHud() { HUDB = document.body.classList.contains('hudc') ? document.getElementById('hudTab').getBoundingClientRect().bottom : _hudEl.getBoundingClientRect().bottom; document.documentElement.style.setProperty('--hudB', Math.round(HUDB) + 'px'); }
 new ResizeObserver(measureHud).observe(_hudEl); addEventListener('resize', measureHud); measureHud();
 function placeLabels() {
   const W = innerWidth, H = innerHeight, placed = []; if ((placeLabels.n = (placeLabels.n || 0) + 1) % 15 === 0 || !HUDB) measureHud(); const hudB = HUDB;
@@ -404,7 +404,7 @@ function metrics(T) {
   const PA = score(pa), PB = score(pb);
   const front = 50 + 40 * (PA - PB) / (PA + PB + 5);
   const lv = LV.find(l => e24 < l[0]);
-  countTo($('#escN'), e24); $('#escL').textContent = lv[1]; $('#escL').style.color = lv[2];
+  countTo($('#escN'), e24); setTimeout(hudTabText, 900); $('#escL').textContent = lv[1]; $('#escL').style.color = lv[2];
   $('#escSub').textContent = `7d avg ${e7} ${e24 > e7 + 5 ? '↑' : e24 < e7 - 5 ? '↓' : '→'} · ${d1.length} reports`;
   $('#escBar').style.left = `calc(${e24}% - 1.5px)`;
   $('#tugA').style.width = front + '%'; $('#tugB').style.width = (100 - front) + '%'; $('#tugM').style.left = `calc(${front}% - 1px)`;
@@ -670,6 +670,7 @@ const BRK_SEEN = new Set(LSg('fl_brk', []));
 function breaking(e, force) {
   if (!force && (BRK_SEEN.has(e.id) || S.mode === 'scrub' || document.visibilityState !== 'visible')) { if (!force) { S.live = S.live || []; } return; }
   BRK_SEEN.add(e.id); localStorage.setItem('fl_brk', JSON.stringify([...BRK_SEEN].slice(-200)));
+  if (document.body.classList.contains('hudc')) { miniBreaking(e); return; }
   const [nm, ic, col] = TY[e.type]; const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null; const P0 = evPos(e);
   const where = P0.off ? cap(P0.where) + ' (off-map)' : P0.unk ? 'Location not stated' : cap(P0.where);
   const words = esc(e.title).split(' ').map((w, i) => `<span style="animation-delay:${1.15 + i * .07}s">${w}</span>`).join(' ');
@@ -886,6 +887,30 @@ $('#sidesBody').addEventListener('click', ev => {
   const o = ev.target.closest('.sbo'); if (o) { openStory(S.events.find(x => x.id === o.dataset.id)); return; }
   const f = ev.target.closest('.sbf'); if (f) { const e = S.events.find(x => x.id === f.dataset.id); if (e) { S.userAt = -1e9; go(0); setTimeout(() => play(e), 250); } }
 });
+
+
+// ---- collapsible top HUD (state remembered); breaking alerts become a compact banner while collapsed
+function setHud(collapsed, save = true) {
+  document.body.classList.toggle('hudc', collapsed); $('#hudTog').setAttribute('aria-expanded', String(!collapsed)); $('#hudTab').setAttribute('aria-expanded', String(collapsed));
+  if (save) localStorage.setItem('fl_hudc', collapsed ? '1' : '0'); hudTabText();
+  [0, 300, 700, 1100].forEach(t => setTimeout(measureHud, t));
+}
+function hudTabText() { const t = $('#hudTabT'); if (t && S.th) t.textContent = `${S.th.short || S.th.name} · ${$('#escN').textContent} ${$('#escL').textContent}`; }
+$('#hudTog').addEventListener('click', () => setHud(true));
+['#hud', '#hudTab'].forEach(q => $(q).addEventListener('transitionend', measureHud));
+(() => { const t = $('#hudTab'); let d = null;
+  t.addEventListener('pointerdown', e => { d = { y: e.clientY, dy: 0 }; try { t.setPointerCapture(e.pointerId); } catch (_) { } });
+  t.addEventListener('pointermove', e => { if (!d) return; d.dy = e.clientY - d.y; if (d.dy > 0) t.style.transform = `translate3d(-50%,${Math.min(60, d.dy * .6)}px,0)`; });
+  const end = e => { if (!d) return; const dy = d.dy; d = null; t.style.transform = ''; if (e.type !== 'pointercancel' && (dy > 24 || Math.abs(dy) < 8)) setHud(false); };
+  t.addEventListener('pointerup', end); t.addEventListener('pointercancel', end); })();
+function miniBreaking(e) {
+  const [nm, ic, col] = TY[e.type]; const b = $('#brkMini');
+  b.innerHTML = `<span class="bmk" style="background:${col}">${ic} BREAKING · ${esc(nm)}</span><b>${esc(e.title)}</b><small>${esc(e.outlet)} · ${ago(e.ts)} · tap to read</small>`;
+  b.onclick = () => { b.classList.remove('on'); openStory(e); };
+  b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('on'), 6500);
+  S.userAt = -1e9; play(e);
+}
+setHud(localStorage.getItem('fl_hudc') === '1', false);
 
 // ---- fast lane: Al Jazeera items published by the box poller (scripts/live.py) to a public ntfy topic, polled every minute
 const LIVE_TOPIC = 'fl-live-8143ad24bad1fb3ffba4'; S.fast = {};
