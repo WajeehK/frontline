@@ -149,6 +149,7 @@ const markers = new THREE.Group(); world.add(markers);
 const pinGroup = new THREE.Group(); world.add(pinGroup);
 const BEAM = new THREE.CylinderGeometry(.008, .008, 1, 6); BEAM.translate(0, .5, 0);
 const RING = new THREE.RingGeometry(.86, 1, 48); RING.rotateX(-Math.PI / 2);
+const RING2 = new THREE.RingGeometry(.955, 1, 72); RING2.rotateX(-Math.PI / 2);
 const DISC = new THREE.CircleGeometry(1, 32); DISC.rotateX(-Math.PI / 2);
 let assets = [];
 function buildMarkers(th) {
@@ -223,8 +224,8 @@ function projectile(curve, { color = 0xff8a3a, dur = 1600, delay = 0, size = .09
 function ringPulse(p, color, size, dur = 2200, n = 3, gap = 600) {
   for (let i = 0; i < n; i++) setTimeout(() => {
     const m = new THREE.MeshBasicMaterial({ color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-    const r = add(new THREE.Mesh(RING, m)); r.position.copy(p).y += .03;
-    fade(r, m, dur, t => { r.scale.setScalar(size * (.15 + t)); m.opacity = (1 - t) * .85; });
+    const r = add(new THREE.Mesh(RING2, m)); r.position.copy(p).y += .03;
+    fade(r, m, dur, t => { r.scale.setScalar(size * (.15 + t)); m.opacity = (1 - t) * .7; });
   }, i * gap);
 }
 function beamUp(p, color, dur = 3000, hgt = 2) {
