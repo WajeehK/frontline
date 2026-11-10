@@ -12,8 +12,13 @@ with sync_playwright() as pw:
         pg.goto(U, wait_until='load'); pg.wait_for_function('window.__fl && document.querySelector("#boot").classList.contains("gone")', timeout=60000)
         time.sleep(2.5); pg.screenshot(path=f'{out}/{tag}-battlefield.png')
         # force a kinetic event mid-animation
-        pg.evaluate("""()=>{const S=__fl.S;S.queue=[];S.nextAt=1e12;const e=S.events.find(e=>['missile','air','drone'].includes(e.type)&&e.actor)||S.events.find(e=>e.type!=='statement');__fl.play(e,{fly:false});return e.title}""")
-        time.sleep(2.0); pg.screenshot(path=f'{out}/{tag}-event.png')
+        pg.evaluate("""()=>{const S=__fl.S;S.queue=[];S.nextAt=1e12;const e=S.events.find(e=>['missile','air','drone'].includes(e.type)&&e.actor)||S.events.find(e=>e.type!=='statement');__fl.play(e);return e.title}""")
+        time.sleep(2.3); pg.screenshot(path=f'{out}/{tag}-event.png')
+        if mob:
+            pg.goto(U.split('#')[0] + '#t=yemen-red-sea', wait_until='load'); pg.reload(wait_until='load'); pg.wait_for_function('window.__fl && document.querySelector("#boot").classList.contains("gone")', timeout=60000); time.sleep(1.5)
+            pg.evaluate("""()=>{const S=__fl.S;S.queue=[];S.nextAt=1e12;const e=S.events.find(e=>e.type==='missile'&&e.actor);__fl.play(e);}""")
+            time.sleep(1.6); pg.screenshot(path=f'{out}/{tag}-missile-arc.png'); time.sleep(2.2); pg.screenshot(path=f'{out}/{tag}-missile-impact.png')
+            pg.goto(U.split('#')[0] + '#t=us-iran', wait_until='load'); pg.reload(wait_until='load'); pg.wait_for_function('window.__fl && document.querySelector("#boot").classList.contains("gone")', timeout=60000); time.sleep(1)
         pg.evaluate("__fl.go(1)"); time.sleep(1.0); pg.screenshot(path=f'{out}/{tag}-feed.png')
         pg.evaluate("__fl.go(2)"); time.sleep(1.0); pg.screenshot(path=f'{out}/{tag}-replay.png')
         print(tag, '\n'.join(errs[:10]))

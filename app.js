@@ -21,7 +21,7 @@ const bust = () => '?t=' + Math.floor(Date.now() / 60000);
 async function getJSON(u) { const r = await fetch(u + bust(), { cache: 'no-store' }); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }
 
 // ---------------------------------------------------------------- state
-const S = { TH: null, tid: null, th: null, geo: null, events: [], clusters: [], index: null, mode: 'loop', T: null, seen: new Set(), queue: [], qi: 0, nextAt: 0, filter: 'all', speed: 1, playing: false, userAt: 0, focus: null };
+const S = { TH: null, tid: null, th: null, geo: null, events: [], clusters: [], index: null, mode: 'loop', T: null, seen: new Set(), queue: [], qi: 0, nextAt: 0, filter: 'all', speed: 1, playing: false, userAt: -1e9, focus: null };
 
 // ---------------------------------------------------------------- three setup
 const canvas = $('#scene');
@@ -127,7 +127,7 @@ const labelsEl = $('#labels'); let labels = [];
 function addLabel(html, cls, p, pri, extra = {}) { const el = document.createElement('span'); el.className = cls; el.innerHTML = html; labelsEl.appendChild(el); const L = { el, p, pri, w: 0, h: 0, ...extra }; labels.push(L); return L; }
 const _v = new THREE.Vector3();
 function placeLabels() {
-  const W = innerWidth, H = innerHeight, placed = [];
+  const W = innerWidth, H = innerHeight, placed = []; const hudB = $('#hud .meters').getBoundingClientRect().bottom;
   const camD = camera.position.distanceTo(controls.target);
   const sorted = labels.slice().sort((a, b) => b.pri - a.pri);
   for (const L of sorted) {
@@ -136,7 +136,7 @@ function placeLabels() {
     let show = _v.z < 1 && _v.x > -1.1 && _v.x < 1.1 && _v.y > -1.1 && _v.y < 1.1 && (!L.maxD || camD < L.maxD);
     if (!L.w) { L.w = L.el.offsetWidth; L.h = L.el.offsetHeight; }
     let x = (_v.x * .5 + .5) * W - (L.ax ?? .5) * L.w, y = (-_v.y * .5 + .5) * H - (L.ay ?? .5) * L.h;
-    if (L.force) { x = Math.max(8, Math.min(W - L.w - 8, x)); y = Math.max(8, y); }
+    if (L.force) { x = Math.max(8, Math.min(W - L.w - 8, x)); y = Math.max(hudB + 6, y); }
     else if (x < 2 || x + L.w > W - 2) show = false;
     if (show && !L.force) for (const r of placed) if (x < r[2] && x + L.w > r[0] && y < r[3] && y + L.h > r[1]) { show = false; break; }
     if (show) { placed.push([x - 3, y - 2, x + L.w + 3, y + L.h + 2]); L.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0)`; }
@@ -205,10 +205,13 @@ function projectile(curve, { color = 0xff8a3a, dur = 1600, delay = 0, size = .09
   const tg = new THREE.BufferGeometry(); const tp = new Float32Array(trail * 3), tc = new Float32Array(trail * 3);
   tg.setAttribute('position', new THREE.BufferAttribute(tp, 3)); tg.setAttribute('color', new THREE.BufferAttribute(tc, 3));
   const tm = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-  const line = add(new THREE.Line(tg, tm)); const hist = []; const st = performance.now() + delay; const cc = new THREE.Color(color); let hit = false;
+  const line = add(new THREE.Line(tg, tm)); const hist = []; let lastPuff = 0; const st = performance.now() + delay; const cc = new THREE.Color(color); let hit = false;
   fx.push(now => {
     const t = (now - st) / dur; if (t < 0) return true;
-    if (t < 1) { const e = t < .5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2; const q = curve.getPoint(.15 * t + .85 * e); head.visible = true; head.position.copy(q); hist.unshift(q.clone()); }
+    if (t < 1) { const e = t < .5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2; const q = curve.getPoint(.15 * t + .85 * e); head.visible = true; head.position.copy(q); hist.unshift(q.clone());
+      if (now - (lastPuff || 0) > 45) { lastPuff = now; const pf = add(sprite(GLOW, cc, size * 1.3)); pf.position.copy(q); const ps = add(sprite(SMOKE, new THREE.Color(0x8a8580), size * 1.2, false)); ps.position.copy(q);
+        fade(pf, pf.material, 700, u => { pf.material.opacity = (1 - u) * .7; pf.scale.setScalar(size * (1.3 - u)); });
+        fade(ps, ps.material, 1600, u => { ps.material.opacity = (1 - u) * .35; ps.scale.setScalar(size * (1.2 + u * 2.5)); ps.position.y = q.y + u * .08; }); } }
     else { if (!hit) { hit = true; head.visible = false; onHit && onHit(); } hist.pop(); }
     if (hist.length > trail) hist.pop();
     for (let i = 0; i < trail; i++) { const q = hist[Math.min(i, hist.length - 1)] || head.position; tp.set([q.x, q.y, q.z], i * 3); const f = (1 - i / trail) ** 1.5; tc.set([cc.r * f, cc.g * f, cc.b * f], i * 3); }
@@ -306,7 +309,8 @@ function callout(e, P) {
   const [nm, , col] = TY[e.type];
   const where = P.off ? `<span class="off">↗ ${esc(cap(P.where))} (off-map)</span>` : P.unk ? 'location not stated' : esc(cap(P.where)) + (P.approx ? ' (country-level)' : '');
   const L = addLabel(`<b class="tg" style="color:${col}">${nm}</b>${esc(e.title.length > 90 ? e.title.slice(0, 88) + '…' : e.title)}<small>${esc(e.outlet)} · ${where}</small>`, 'co', P.p.clone().setY(P.p.y + .35), 10, { ay: 1, force: true });
-  setTimeout(() => { L.op = 0; setTimeout(() => { L.dead = true; L.el.remove(); labels = labels.filter(x => x !== L); }, 500); }, 5200);
+  const kill = () => { if (L.dead) return; L.op = 0; setTimeout(() => { L.dead = true; L.el.remove(); labels = labels.filter(x => x !== L); }, 450); };
+  if (S.lastCo) S.lastCo(); S.lastCo = kill; setTimeout(kill, 5200);
 }
 function play(e, { fly = true } = {}) {
   if (!S.th) return;
@@ -391,7 +395,7 @@ function renderFeed() {
     ${c.more.length ? `<details><summary>+${c.more.length} more report${c.more.length > 1 ? 's' : ''} of this</summary>${c.more.map(m => `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.outlet)} · ${esc(m.title)} ↗</a>`).join('')}</details>` : ''}</div>`; }).join('')
     : `<div class="empty">No reports in this filter yet. Data refreshes every ~15 minutes.</div>`;
 }
-$('#feedList').addEventListener('click', ev => { const b = ev.target.closest('button[data-id]'); if (!b) return; const e = S.events.find(x => x.id === b.dataset.id); if (!e) return; S.userAt = 0; if (!DESK.matches) go(0); setTimeout(() => play(e), 250); });
+$('#feedList').addEventListener('click', ev => { const b = ev.target.closest('button[data-id]'); if (!b) return; const e = S.events.find(x => x.id === b.dataset.id); if (!e) return; S.userAt = -1e9; if (!DESK.matches) go(0); setTimeout(() => play(e), 250); });
 document.querySelectorAll('.filters button').forEach(b => b.addEventListener('click', () => { S.filter = b.dataset.f; document.querySelectorAll('.filters button').forEach(x => x.classList.toggle('on', x === b)); renderFeed(); }));
 
 // ---------------------------------------------------------------- sequencing: loop recent reports, animate new ones live
