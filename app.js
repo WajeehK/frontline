@@ -269,7 +269,7 @@ function floatIcon(map, p, color, size = .5, dur = 3600) {
   fade(s, s.material, dur, t => { s.material.opacity = Math.sin(Math.min(1, t * 1.3) * Math.PI) * .95; s.position.y = p.y + .25 + t * .7; s.position.x = p.x + Math.sin(t * 6) * .05; });
 }
 // ---- v9 per-type visuals: each report type gets its own symbol so a claim never looks like a strike
-const BUBBLE = tex((g, n) => { g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 6; g.beginPath(); g.roundRect(n * .12, n * .18, n * .76, n * .5, n * .14); g.fill(); g.beginPath(); g.moveTo(n * .3, n * .66); g.lineTo(n * .24, n * .86); g.lineTo(n * .46, n * .66); g.fill();
+const BUBBLE = tex((g, n) => { g.fillStyle = '#fff'; g.beginPath(); g.roundRect(n * .12, n * .18, n * .76, n * .5, n * .14); g.fill(); g.beginPath(); g.moveTo(n * .3, n * .66); g.lineTo(n * .24, n * .86); g.lineTo(n * .46, n * .66); g.fill();
   g.shadowBlur = 0; g.fillStyle = '#222'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(n * (.34 + i * .16), n * .43, n * .045, 0, 7); g.fill(); } }, 96);
 const WARN = tex((g, n) => { g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 6; g.beginPath(); g.moveTo(n / 2, n * .1); g.lineTo(n * .92, n * .86); g.lineTo(n * .08, n * .86); g.closePath(); g.fill();
   g.shadowBlur = 0; g.fillStyle = '#222'; g.fillRect(n * .46, n * .35, n * .08, n * .28); g.fillRect(n * .46, n * .69, n * .08, n * .08); }, 96);
@@ -279,7 +279,7 @@ const BADGE = tex((g, n) => { g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.sh
 const DASH = tex((g, n) => { g.strokeStyle = '#fff'; g.lineWidth = n * .03; g.setLineDash([n * .07, n * .05]); g.beginPath(); g.arc(n / 2, n / 2, n * .46, 0, 7); g.stroke(); }, 128);
 const SQ = tex((g, n) => { g.fillStyle = '#fff'; g.fillRect(n * .1, n * .35, n * .8, n * .3); }, 32);
 function speechPulse(p, color) { // statement: speech bubble rising with quick sound-wave arcs
-  floatIcon(BUBBLE, p.clone().setY(p.y + .12), color, .42, 3400); ringPulse(p, new THREE.Color(color).getHex(), .9, 1100, 4, 260); }
+  floatIcon(BUBBLE, p.clone().setY(p.y + .12), color, .24, 3400); ringPulse(p, new THREE.Color(color).getHex(), .9, 1100, 4, 260); }
 function warnRing(p, color = 0xffc04d) { // threat: rotating dashed warning ring + hazard sign, no impact
   const m = new THREE.MeshBasicMaterial({ map: DASH, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
   const r = add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), m)); r.position.copy(p).y += .04;
@@ -754,15 +754,15 @@ function endScen() {
 }
 $('#scBarX').addEventListener('click', endScen);
 const scT = (f, ms) => SC.timers.push(setTimeout(f, ms));
-function scRing(lat, lon, km, color, label, dashed) {
-  const R = scKm(lat, lon, km); const p = ground(lat, lon);
+function scRing(lat, lon, km, color, label, mag = 1) {
+  const R = scKm(lat, lon, km) * mag; const p = ground(lat, lon);
   const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
   const r = add(new THREE.Mesh(RING2, m)); r.position.copy(p).y += .05; r.scale.setScalar(.001); SC.objs.push(r);
   const fm = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
   const fill = add(new THREE.Mesh(DISC, fm)); fill.position.copy(p).y += .04; SC.objs.push(fill);
   const st = performance.now(); fx.push(now => { if (!SC.objs.includes(r)) return false; const t = Math.min(1, (now - st) / 1400); const k = R * (1 - (1 - t) ** 3);
     r.scale.setScalar(Math.max(.001, k)); fill.scale.setScalar(Math.max(.001, k)); m.opacity = .85; fm.opacity = .1 + .04 * Math.sin(now / 400); return true; });
-  if (label) { const L = addLabel(`<i style="color:${color}">◯</i> ${esc(label)} · ${km < 1 ? km.toFixed(2) : km.toFixed(1)} km <em>est.</em>`, 'scL', p.clone().add(new THREE.Vector3(R * .72, .05, R * .72)), 6, { ay: .5 }); SC.labs.push(L); }
+  if (label) { const L = addLabel(`<i style="color:${color}">◯</i> ${esc(label)} · ${km < 1 ? km.toFixed(2) : km.toFixed(1)} km <em>est.${mag > 1 ? ' · drawn ×' + Math.round(mag) : ''}</em>`, 'scL', p.clone().add(new THREE.Vector3(R * .72, .05, R * .72)), 6, { ay: .5 }); SC.labs.push(L); }
 }
 function nukeFx(p, Y) {
   const fl = $('#scFlash'); if (fl) { fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); }
@@ -783,13 +783,13 @@ function runScen(sc) {
   if (!sc) return; if (SC.on) endScen(); SC.on = sc; S.nextAt = performance.now() + 1e9; S.userAt = -1e9;
   $('#scen').classList.remove('open'); $('#scrim').classList.remove('on'); document.body.classList.add('scen'); $('#scBarT').textContent = sc.short;
   const tg = sc.targets || [sc.target]; const T0 = tg[0]; const tp = tg.map(t => ground(t.lat, t.lon)); const o = sc.origin ? scClamp(sc.origin.lat, sc.origin.lon) : null;
-  flyTo(tp[0], sc.kind === 'nuclear' ? 7 : 9);
+  flyTo(tp[0], sc.kind === 'nuclear' ? 5 : 9);
   const lab = (t, p) => { const L = addLabel(`<b>SIM</b> ${esc(t.name)}`, 'scT', p.clone().setY(p.y + .3), 9, { ay: 1, force: true }); SC.labs.push(L); };
   tg.forEach((t, i) => lab(t, tp[i]));
   if (o && sc.origin) { const L = addLabel(`↗ ${esc(sc.origin.name)}`, 'scT dim', o.clone().setY(o.y + .25), 4, { ay: 1 }); SC.labs.push(L); }
   const k = sc.kind; let tHit = 2200;
   const shoot = (from, to, i, n, cb, opt = {}) => scT(() => projectile(arcPath(from, to, opt.h || .35), { color: opt.color || 0xff6a2b, dur: opt.dur || 2000, size: opt.size || .09, onHit: cb }), 600 + i * (opt.gap || 260));
-  if (k === 'nuclear') { shoot(o, tp[0], 0, 1, () => { nukeFx(tp[0], sc.yield_kt); nukeRadii(sc.yield_kt, sc.burst === 'surface').forEach((r, i) => scT(() => scRing(T0.lat, T0.lon, r[1], r[2], r[0]), 500 + i * 450));
+  if (k === 'nuclear') { shoot(o, tp[0], 0, 1, () => { nukeFx(tp[0], sc.yield_kt); const RR = nukeRadii(sc.yield_kt, sc.burst === 'surface'); const mag = Math.max(1, .6 / scKm(T0.lat, T0.lon, RR[4][1])); RR.forEach((r, i) => scT(() => scRing(T0.lat, T0.lon, r[1], r[2], r[0], mag), 500 + i * 450));
       if (sc.fallout) scT(() => scFallout(T0.lat, T0.lon, sc.fallout.dir_deg, 160), 3200); }, { color: 0xffffff, dur: 3000, size: .12, h: .5 }); tHit = 3600; }
   else if (k === 'bunker') { tp.forEach((p, i) => shoot(o, p, i * 4, 1, () => { groundHit(p, 3, 0x8a6a4a, 3000); scT(() => { explosion(p, 4, 0xffb060); ringPulse(p, 0xffb060, 1.2, 1800, 3, 250); }, 450); scT(() => explosion(p, 3, 0xffb060), 900); }, { dur: 2600, color: 0xd0d8ff, h: .45 })); tHit = 4200; }
   else if (k === 'mines') { tp.forEach((p, i) => scT(() => mineHit(p, 4, 0x4fd1ff), 400 + i * 1500)); scT(() => scRing(26.6, 56.4, 45, '#4fd1ff', 'Strait closed (illustrative zone)'), 4800); tHit = 5200; }
@@ -802,13 +802,19 @@ function runScen(sc) {
       shoot(o || p.clone().add(new THREE.Vector3(-2, 0, -1)), q, j * n + i, n, () => { explosion(q, k === 'energy' ? 4 : 3, k === 'energy' ? 0xff7a1a : 0xff9a5a); if (k === 'energy') beamUp(q, 0xff7a1a, 3000, 1.2); }, { dur: k === 'irbm' ? 1500 : 2000, gap: k === 'irbm' ? 120 : 260, color: k === 'airstrikes' ? 0xffb35c : 0xff6a2b, h: k === 'irbm' ? .8 : .35 }); } }); tHit = 3200 + tp.length * n * 200; }
   scT(() => showScenFx(sc), tHit + 1600);
 }
+function scInset(sc, R) { // true-scale map: rings and nearby cities in km around the target
+  const T0 = sc.target || sc.targets[0]; const W = Math.max(R[4][1] * 1.4, 30); const k = 140 / W; const r = Math.PI / 180;
+  const xy = (la, lo) => [((lo - T0.lon) * 111.32 * Math.cos(T0.lat * r)) * k, -((la - T0.lat) * 110.57) * k];
+  const rings = R.slice().reverse().map(q => `<circle r="${(q[1] * k).toFixed(1)}" fill="${q[2]}22" stroke="${q[2]}" stroke-width="1"/>`).join('');
+  const cs = (sc.cities || []).map(([n, la, lo]) => { const [x, y] = xy(la, lo); return Math.abs(x) < 150 && Math.abs(y) < 150 ? `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.5" fill="#fff"/><text x="${(x + 4).toFixed(1)}" y="${(y + 3).toFixed(1)}">${esc(n)}</text>` : ''; }).join('');
+  return `<svg class="scInset" viewBox="-150 -150 300 300">${rings}<circle r="2" fill="#fff"/>${cs}<line x1="-140" y1="138" x2="${(-140 + 10 * k).toFixed(1)}" y2="138" stroke="#fff"/><text x="-140" y="132">10 km</text><text x="40" y="144">true scale · est.</text></svg>`; }
 function showScenFx(sc) {
   $('#scenFx')?.remove(); const el = document.createElement('aside'); el.id = 'scenFx'; el.className = 'glass';
   const tg = sc.targets || [sc.target]; const T0 = tg[0]; const tr = scenTrigger(sc);
   let rad = ''; if (sc.kind === 'nuclear') { const R = nukeRadii(sc.yield_kt, sc.burst === 'surface');
     rad = `<h4>Blast &amp; thermal radii <em>ESTIMATE</em></h4><p class="dim">${esc(sc.yield_note)} ${sc.burst === 'surface' ? 'Surface burst assumed (blast/thermal ranges ×0.8 vs optimum-height airburst).' : ''} Basis: cube-root scaling from Glasstone &amp; Dolan (1977), calibrated so 15 kt ≈ Hiroshima (5 psi ≈ 1.7 km). Real effects vary with terrain, weather and burst depth.</p>
     <table class="scTab">${R.map(r => `<tr><td><i style="background:${r[2]}"></i>${r[0]}</td><td>${r[1] < 1 ? r[1].toFixed(2) : r[1].toFixed(1)} km</td><td class="dim">${r[3]}</td></tr>`).join('')}</table>
-    ${sc.fallout ? `<p class="dim">☢ ${esc(sc.fallout.note)}</p>` : ''}`; }
+    ${scInset(sc, R)}${sc.fallout ? `<p class="dim">☢ ${esc(sc.fallout.note)}</p>` : ''}`; }
   const R = sc.kind === 'nuclear' ? nukeRadii(sc.yield_kt, sc.burst === 'surface') : null;
   const cities = (sc.cities || []).map(([n, la, lo]) => { const d = Math.min(...tg.map(t => hav(t.lat, t.lon, la, lo))); const inR = R ? R.filter(r => d <= r[1]).map(r => r[0])[0] : null; return [n, d, inR]; }).sort((a, b) => a[1] - b[1]);
   el.innerHTML = `<div class="grab"></div><div class="scHyp">⚠ HYPOTHETICAL · SIMULATION — not a report, not a forecast</div><h3>${esc(sc.title)}</h3>
