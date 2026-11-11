@@ -276,10 +276,11 @@
   "focus": [
    29.0,
    50.0
-  ]
+  ],
+  "kind": "conflict"
  },
  "israel-gaza-lebanon": {
-  "name": "Israel \u00b7 Gaza \u00b7 Lebanon",
+  "name": "Israel · Gaza · Lebanon",
   "bbox": [
    32.2,
    29.4,
@@ -297,7 +298,7 @@
    },
    {
     "id": "B",
-    "name": "Hamas \u00b7 Hezbollah \u00b7 armed groups",
+    "name": "Hamas · Hezbollah · armed groups",
     "short": "HAMAS/HEZB.",
     "color": "#ff4b3e"
    }
@@ -471,7 +472,8 @@
   "focus": [
    32.3,
    35.2
-  ]
+  ],
+  "kind": "conflict"
  },
  "russia-ukraine": {
   "name": "Russia vs Ukraine",
@@ -687,10 +689,11 @@
   "focus": [
    48.8,
    34.5
-  ]
+  ],
+  "kind": "conflict"
  },
  "yemen-red-sea": {
-  "name": "Yemen \u00b7 Red Sea",
+  "name": "Yemen · Red Sea",
   "bbox": [
    32,
    10,
@@ -702,7 +705,7 @@
   "sides": [
    {
     "id": "A",
-    "name": "US \u00b7 Saudi \u00b7 Israel",
+    "name": "US · Saudi · Israel",
     "short": "COALITION",
     "color": "#4da3ff"
    },
@@ -842,6 +845,477 @@
   "focus": [
    17.0,
    43.5
+  ],
+  "kind": "conflict"
+ },
+ "pakistan-india": {
+  "name": "Pakistan · India",
+  "kind": "tension",
+  "bbox": [
+   60,
+   20,
+   82,
+   37.5
+  ],
+  "zoom": 6,
+  "grid": 340,
+  "sides": [
+   {
+    "id": "A",
+    "name": "India",
+    "short": "INDIA",
+    "color": "#ff9933"
+   },
+   {
+    "id": "B",
+    "name": "Pakistan",
+    "short": "PAKISTAN",
+    "color": "#2ecc71"
+   }
+  ],
+  "assets": [
+   [
+    "A",
+    "New Delhi",
+    "capital",
+    28.61,
+    77.21
+   ],
+   [
+    "A",
+    "Srinagar",
+    "city",
+    34.08,
+    74.8
+   ],
+   [
+    "A",
+    "Amritsar",
+    "city",
+    31.63,
+    74.87
+   ],
+   [
+    "A",
+    "Mumbai",
+    "city",
+    19.08,
+    72.88
+   ],
+   [
+    "A",
+    "Jammu",
+    "city",
+    32.73,
+    74.86
+   ],
+   [
+    "B",
+    "Islamabad",
+    "capital",
+    33.69,
+    73.05
+   ],
+   [
+    "B",
+    "Lahore",
+    "city",
+    31.55,
+    74.34
+   ],
+   [
+    "B",
+    "Karachi",
+    "city",
+    24.86,
+    67.0
+   ],
+   [
+    "B",
+    "Muzaffarabad",
+    "city",
+    34.37,
+    73.47
+   ],
+   [
+    "B",
+    "Rawalpindi",
+    "city",
+    33.6,
+    73.04
+   ]
+  ],
+  "labels": [
+   [
+    "INDIA",
+    24.5,
+    78.5
+   ],
+   [
+    "PAKISTAN",
+    29.5,
+    69.0
+   ],
+   [
+    "AFGHANISTAN",
+    34.0,
+    65.5
+   ],
+   [
+    "Line of Control",
+    34.6,
+    74.2
+   ],
+   [
+    "Arabian Sea",
+    21.5,
+    64.5
+   ],
+   [
+    "KASHMIR",
+    35.0,
+    76.0
+   ]
+  ],
+  "keywords": {
+   "must": [
+    "kashmir",
+    "line of control",
+    "pahalgam",
+    "operation sindoor",
+    "indus waters",
+    "india-pakistan",
+    "indo-pak",
+    "pakistan-india",
+    "india pakistan",
+    "lashkar-e-taiba",
+    "jaish-e-mohammed"
+   ],
+   "pair": [
+    [
+     "india",
+     "indian",
+     "new delhi",
+     "modi",
+     "rajnath singh",
+     "jaishankar"
+    ],
+    [
+     "pakistan",
+     "pakistani",
+     "islamabad",
+     "rawalpindi",
+     "sharif",
+     "asim munir",
+     "isi"
+    ]
+   ]
+  },
+  "focus": [
+   32.0,
+   73.5
+  ]
+ },
+ "china-taiwan": {
+  "name": "China · Taiwan",
+  "kind": "tension",
+  "bbox": [
+   112,
+   16,
+   128,
+   30
+  ],
+  "zoom": 6,
+  "grid": 340,
+  "sides": [
+   {
+    "id": "A",
+    "name": "Taiwan · US · Japan",
+    "short": "TAIWAN",
+    "color": "#4da3ff"
+   },
+   {
+    "id": "B",
+    "name": "China (PRC)",
+    "short": "CHINA",
+    "color": "#ff4b3e"
+   }
+  ],
+  "assets": [
+   [
+    "A",
+    "Taipei",
+    "capital",
+    25.03,
+    121.57
+   ],
+   [
+    "A",
+    "Kaohsiung",
+    "naval",
+    22.62,
+    120.3
+   ],
+   [
+    "A",
+    "Kinmen",
+    "island",
+    24.43,
+    118.32
+   ],
+   [
+    "A",
+    "Penghu",
+    "island",
+    23.57,
+    119.58
+   ],
+   [
+    "A",
+    "Okinawa (Kadena AB)",
+    "air",
+    26.35,
+    127.77
+   ],
+   [
+    "B",
+    "Fuzhou",
+    "city",
+    26.07,
+    119.3
+   ],
+   [
+    "B",
+    "Xiamen",
+    "city",
+    24.48,
+    118.09
+   ],
+   [
+    "B",
+    "Pingtan",
+    "island",
+    25.5,
+    119.79
+   ],
+   [
+    "B",
+    "Ningbo (East Sea Fleet)",
+    "naval",
+    29.87,
+    121.55
+   ]
+  ],
+  "labels": [
+   [
+    "TAIWAN",
+    23.7,
+    121.0
+   ],
+   [
+    "CHINA",
+    27.5,
+    116.0
+   ],
+   [
+    "Taiwan Strait",
+    24.3,
+    119.6
+   ],
+   [
+    "PHILIPPINES",
+    18.0,
+    121.2
+   ],
+   [
+    "East China Sea",
+    28.5,
+    124.5
+   ],
+   [
+    "South China Sea",
+    19.5,
+    115.5
+   ],
+   [
+    "JAPAN",
+    27.0,
+    128.0
+   ]
+  ],
+  "keywords": {
+   "must": [
+    "taiwan",
+    "taiwanese",
+    "taipei",
+    "taiwan strait",
+    "kinmen",
+    "matsu",
+    "pla",
+    "people's liberation army",
+    "lai ching-te",
+    "beijing warns",
+    "china coast guard",
+    "median line",
+    "adiz",
+    "penghu",
+    "senkaku",
+    "japan-china",
+    "takaichi"
+   ]
+  },
+  "focus": [
+   24.5,
+   120.0
+  ]
+ },
+ "koreas": {
+  "name": "North · South Korea",
+  "kind": "tension",
+  "bbox": [
+   123,
+   33,
+   132,
+   43.5
+  ],
+  "zoom": 7,
+  "grid": 340,
+  "sides": [
+   {
+    "id": "A",
+    "name": "South Korea · US",
+    "short": "ROK·US",
+    "color": "#4da3ff"
+   },
+   {
+    "id": "B",
+    "name": "North Korea",
+    "short": "DPRK",
+    "color": "#ff4b3e"
+   }
+  ],
+  "assets": [
+   [
+    "A",
+    "Seoul",
+    "capital",
+    37.57,
+    126.98
+   ],
+   [
+    "A",
+    "Camp Humphreys",
+    "base",
+    36.96,
+    127.03
+   ],
+   [
+    "A",
+    "Osan Air Base",
+    "air",
+    37.09,
+    127.03
+   ],
+   [
+    "A",
+    "Busan",
+    "naval",
+    35.1,
+    129.04
+   ],
+   [
+    "A",
+    "Incheon",
+    "city",
+    37.46,
+    126.7
+   ],
+   [
+    "B",
+    "Pyongyang",
+    "capital",
+    39.04,
+    125.76
+   ],
+   [
+    "B",
+    "Yongbyon",
+    "nuclear",
+    39.8,
+    125.75
+   ],
+   [
+    "B",
+    "Punggye-ri",
+    "nuclear",
+    41.28,
+    129.08
+   ],
+   [
+    "B",
+    "Sohae launch site",
+    "missile",
+    39.66,
+    124.71
+   ],
+   [
+    "B",
+    "Wonsan",
+    "naval",
+    39.15,
+    127.44
+   ]
+  ],
+  "labels": [
+   [
+    "NORTH KOREA",
+    40.3,
+    127.0
+   ],
+   [
+    "SOUTH KOREA",
+    36.3,
+    128.0
+   ],
+   [
+    "DMZ",
+    38.25,
+    127.3
+   ],
+   [
+    "Yellow Sea",
+    36.5,
+    124.0
+   ],
+   [
+    "Sea of Japan",
+    39.5,
+    131.0
+   ],
+   [
+    "CHINA",
+    42.3,
+    125.0
+   ]
+  ],
+  "keywords": {
+   "must": [
+    "north korea",
+    "north korean",
+    "north koreans",
+    "pyongyang",
+    "dprk",
+    "kim jong un",
+    "kim yo jong",
+    "dmz",
+    "inter-korean",
+    "korean peninsula",
+    "northern limit line"
+   ]
+  },
+  "focus": [
+   38.5,
+   127.0
   ]
  }
 }

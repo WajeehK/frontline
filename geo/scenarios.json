@@ -1,0 +1,1384 @@
+{
+ "note": "HYPOTHETICAL scenarios for illustration only. Not reports, not forecasts. Kept out of the feed, alerts and sentiment. Locations are public, widely reported sites; estimates are marked and their basis shown.",
+ "items": [
+  {
+   "id": "ir-pickaxe-nuke",
+   "tid": "us-iran",
+   "kind": "nuclear",
+   "title": "US nuclear strike on Pickaxe Mountain",
+   "short": "Nuclear strike · Pickaxe Mtn",
+   "claim": "Tucker Carlson claimed on 1 Nov 2026 (citing an unnamed \"informed observer\") that the US might use a nuclear weapon on Kuh-e Kolang Gaz La. No US or Israeli official confirmed it; Trump said on 16 Oct 2026 he \"wouldn't use nuclear\". Fact-checkers rate the claim unproven/misleading.",
+   "trigger": "pickaxe|kolang|nuclear strike on iran|nuke iran|nuclear option",
+   "origin": {
+    "name": "US bomber (direction illustrative)",
+    "lat": 18.0,
+    "lon": 38.0
+   },
+   "weapon": "Air-delivered gravity bomb (assumed)",
+   "target": {
+    "name": "Kuh-e Kolang Gaz La (Pickaxe Mountain), ~2 km south of Natanz",
+    "lat": 33.7,
+    "lon": 51.73
+   },
+   "yield_kt": 360,
+   "yield_note": "Assumption: 360 kt, the publicly stated maximum yield of the US B61-13 gravity bomb. Real choices could be far lower or higher.",
+   "burst": "surface",
+   "cities": [
+    [
+     "Natanz (town)",
+     33.512,
+     51.916
+    ],
+    [
+     "Badrud",
+     33.69,
+     52.01
+    ],
+    [
+     "Kashan",
+     33.983,
+     51.436
+    ],
+    [
+     "Aran o Bidgol",
+     34.058,
+     51.484
+    ],
+    [
+     "Ardestan",
+     33.376,
+     52.369
+    ],
+    [
+     "Isfahan",
+     32.654,
+     51.668
+    ],
+    [
+     "Qom",
+     34.64,
+     50.876
+    ],
+    [
+     "Tehran",
+     35.689,
+     51.389
+    ]
+   ],
+   "fallout": {
+    "dir_deg": 90,
+    "note": "Surface bursts loft soil into a fallout plume. Its length and direction depend on the winds on the day; the plume shown points east only to illustrate shape, it is not a forecast."
+   },
+   "effects": [
+    [
+     "Oil",
+     "up",
+     "Markets would price a major supply-risk shock; Gulf exports pass through Hormuz (~20 mb/d, ~20% of world consumption, EIA/IEA 2025)."
+    ],
+    [
+     "Shipping",
+     "down",
+     "War-risk insurance and rerouting would likely spike across the Gulf and Red Sea."
+    ],
+    [
+     "Escalation",
+     "up",
+     "First nuclear use since 1945; experts quoted by Snopes and CSIS warn of region-wide retaliation and a proliferation cascade."
+    ],
+    [
+     "Radiation",
+     "up",
+     "Fallout over central Iran; contamination extent depends on yield, depth and weather (Glasstone & Dolan ch. 9)."
+    ]
+   ],
+   "ladder": [
+    "Claim / pressure (today)",
+    "Strike decision",
+    "Detonation at Pickaxe",
+    "Iranian missile retaliation on US bases & Israel",
+    "Hormuz disruption",
+    "Great-power crisis (Russia/China)"
+   ],
+   "sources": [
+    [
+     "Snopes: Is Trump admin planning nuclear strike on Iran? (5 Nov 2026)",
+     "https://www.snopes.com/news/2026/11/05/trump-iran-nuclear-strike/"
+    ],
+    [
+     "The Independent: Carlson claim",
+     "https://www.independent.co.uk/news/world/middle-east/tucker-carlson-trump-us-iran-nuclear-pickaxe-mountain-b3077716.html"
+    ],
+    [
+     "What the Fact: fact check",
+     "https://whatthefact.app/fact-checks/2026-11-02-tucker-carlson-trump-days-from-nuclear-strike-iran-pickaxe-mountain"
+    ],
+    [
+     "Glasstone & Dolan, The Effects of Nuclear Weapons (1977), OSTI",
+     "https://www.osti.gov/biblio/6852629"
+    ],
+    [
+     "NUKEMAP (A. Wellerstein)",
+     "https://nuclearsecrecy.com/nukemap/"
+    ],
+    [
+     "IEA: Strait of Hormuz",
+     "https://www.iea.org/about/oil-security-and-emission/strait-of-hormuz"
+    ]
+   ]
+  },
+  {
+   "id": "ir-mop",
+   "tid": "us-iran",
+   "kind": "bunker",
+   "title": "Conventional bunker-buster strike on Pickaxe / Fordow",
+   "short": "GBU-57 strike · Fordow/Pickaxe",
+   "claim": "Trump said (16 Oct 2026) the US might still \"take a shot\" at Pickaxe with conventional ordnance. In June 2025 (Operation Midnight Hammer) B-2s dropped GBU-57 MOPs on Fordow; CSIS counted six double-tapped craters.",
+   "trigger": "fordow|bunker[- ]buster|gbu-57|massive ordnance|pickaxe|b-2",
+   "origin": {
+    "name": "B-2 bombers (direction illustrative)",
+    "lat": 18.0,
+    "lon": 38.0
+   },
+   "weapon": "GBU-57 Massive Ordnance Penetrator (30,000 lb; public specs)",
+   "targets": [
+    {
+     "name": "Fordow enrichment site (struck June 2025)",
+     "lat": 34.885,
+     "lon": 50.996
+    },
+    {
+     "name": "Pickaxe Mountain, near Natanz",
+     "lat": 33.7,
+     "lon": 51.73
+    }
+   ],
+   "cities": [
+    [
+     "Qom",
+     34.64,
+     50.876
+    ],
+    [
+     "Kashan",
+     33.983,
+     51.436
+    ],
+    [
+     "Natanz (town)",
+     33.512,
+     51.916
+    ],
+    [
+     "Tehran",
+     35.689,
+     51.389
+    ],
+    [
+     "Isfahan",
+     32.654,
+     51.668
+    ]
+   ],
+   "facts": [
+    "GBU-57: ~30,000 lb penetrator; public reporting rates it to penetrate roughly 60 m of earth before detonating.",
+    "Public estimates put Pickaxe tunnels 80–100 m deep in granite (CNS 2023, cited by CSIS) — deeper and harder rock than Fordow.",
+    "CSIS: the June 2025 strike on Fordow used 12 MOPs on six aim points (ventilation shafts)."
+   ],
+   "effects": [
+    [
+     "Oil",
+     "up",
+     "Brent typically jumps on strike headlines; in June 2025 it fell 7% once Iran's retaliation proved limited (Reuters)."
+    ],
+    [
+     "Escalation",
+     "up",
+     "Iran retaliated in 2025 with 19 missiles at Al Udeid (Qatar MoD); similar or larger response possible."
+    ],
+    [
+     "Nuclear programme",
+     "down",
+     "Damage likely partial: depth may exceed MOP reach; entrances and power could be cut (CSIS)."
+    ]
+   ],
+   "ladder": [
+    "Threats (today)",
+    "B-2 strike on Fordow/Pickaxe",
+    "Iranian missile retaliation",
+    "Gulf shipping harassment",
+    "Negotiation or wider war"
+   ],
+   "sources": [
+    [
+     "CSIS: Options for targeting Fordow",
+     "https://www.csis.org/analysis/options-targeting-irans-fordow-nuclear-facility"
+    ],
+    [
+     "CSIS: Damage to Iran's nuclear program",
+     "https://www.csis.org/analysis/damage-irans-nuclear-program-can-it-rebuild"
+    ],
+    [
+     "CSIS: What Midnight Hammer means",
+     "https://www.csis.org/analysis/what-operation-midnight-hammer-means-future-irans-nuclear-ambitions"
+    ],
+    [
+     "Reuters: Iran fires missiles at US base in Qatar (2025)",
+     "https://www.reuters.com/world/middle-east/iran-weighs-retaliation-against-us-strikes-nuclear-sites-2025-06-23/"
+    ]
+   ]
+  },
+  {
+   "id": "ir-hormuz",
+   "tid": "us-iran",
+   "kind": "mines",
+   "title": "Iran mines / closes the Strait of Hormuz",
+   "short": "Hormuz mined & closed",
+   "claim": "Iran's IRGC has said tankers caught fire after hitting mines in the strait (Nov 2026 reports) and Iranian officials have said Hormuz \"will stay shut\".",
+   "trigger": "hormuz|mine|tanker",
+   "weapon": "Naval mines, fast boats, anti-ship missiles (illustrative)",
+   "origin": {
+    "name": "Bandar Abbas",
+    "lat": 27.18,
+    "lon": 56.27
+   },
+   "targets": [
+    {
+     "name": "Inbound lane",
+     "lat": 26.62,
+     "lon": 56.45
+    },
+    {
+     "name": "Outbound lane",
+     "lat": 26.45,
+     "lon": 56.62
+    },
+    {
+     "name": "Off Larak",
+     "lat": 26.8,
+     "lon": 56.4
+    }
+   ],
+   "cities": [
+    [
+     "Bandar Abbas",
+     27.18,
+     56.27
+    ],
+    [
+     "Khasab (Oman)",
+     26.18,
+     56.25
+    ],
+    [
+     "Fujairah",
+     25.12,
+     56.33
+    ],
+    [
+     "Dubai",
+     25.2,
+     55.27
+    ],
+    [
+     "Doha",
+     25.29,
+     51.53
+    ]
+   ],
+   "effects": [
+    [
+     "Oil",
+     "up",
+     "~20 mb/d (≈20% of world consumption) moved through Hormuz in 2025; only 3.5–5.5 mb/d of bypass pipeline capacity (IEA)."
+    ],
+    [
+     "LNG",
+     "up",
+     "About one-fifth of global LNG trade transits the strait (EIA), mainly Qatar."
+    ],
+    [
+     "Shipping",
+     "down",
+     "Tanker traffic halts; insurers cancel war-risk cover; Asia (≈80% of flows) hit hardest."
+    ],
+    [
+     "Escalation",
+     "up",
+     "US/allied mine-clearing and escort operations would follow."
+    ]
+   ],
+   "ladder": [
+    "Harassment / seizures",
+    "Mines laid",
+    "Tankers hit",
+    "Strait closed",
+    "US mine-clearing & strikes on IRGC Navy"
+   ],
+   "sources": [
+    [
+     "IEA: Strait of Hormuz",
+     "https://www.iea.org/about/oil-security-and-emission/strait-of-hormuz"
+    ],
+    [
+     "EIA: Hormuz remains critical chokepoint",
+     "https://www.eia.gov/todayinEnergy/detail.php?id=65504"
+    ],
+    [
+     "EIA: World oil transit chokepoints",
+     "https://www.eia.gov/international/content/analysis/special_topics/World_Oil_Transit_Chokepoints/"
+    ]
+   ]
+  },
+  {
+   "id": "ir-energy",
+   "tid": "us-iran",
+   "kind": "energy",
+   "title": "Strikes on Gulf energy infrastructure",
+   "short": "Gulf oil & gas sites hit",
+   "claim": "Precedent: on 14 Sep 2019 drones and cruise missiles hit Saudi Aramco's Abqaiq and Khurais, briefly halting 5.7 mb/d — about half of Saudi output (Reuters).",
+   "trigger": "abqaiq|ras tanura|ras laffan|refinery|oil facilit|energy infrastructure|kharg",
+   "weapon": "Drones and cruise missiles (illustrative)",
+   "origin": {
+    "name": "Southern Iran (illustrative)",
+    "lat": 28.9,
+    "lon": 50.8
+   },
+   "targets": [
+    {
+     "name": "Abqaiq processing (hit 2019)",
+     "lat": 25.94,
+     "lon": 49.68
+    },
+    {
+     "name": "Ras Tanura terminal",
+     "lat": 26.64,
+     "lon": 50.16
+    },
+    {
+     "name": "Ras Laffan LNG",
+     "lat": 25.91,
+     "lon": 51.56
+    }
+   ],
+   "cities": [
+    [
+     "Dammam",
+     26.43,
+     50.1
+    ],
+    [
+     "Dhahran",
+     26.29,
+     50.11
+    ],
+    [
+     "Doha",
+     25.29,
+     51.53
+    ],
+    [
+     "Manama",
+     26.23,
+     50.59
+    ]
+   ],
+   "effects": [
+    [
+     "Oil",
+     "up",
+     "2019 precedent removed ~5.7 mb/d briefly; Reuters reported it left the world without spare capacity."
+    ],
+    [
+     "Gas",
+     "up",
+     "Ras Laffan is Qatar's LNG hub; outages would tighten Europe and Asia gas."
+    ],
+    [
+     "Escalation",
+     "up",
+     "Gulf states could join or restrain US action; reciprocal strikes on Iranian energy (e.g. Kharg) possible."
+    ]
+   ],
+   "ladder": [
+    "Threats against Gulf hosts",
+    "Drone/missile strike on facilities",
+    "Output halted",
+    "Reciprocal strikes on Iranian energy",
+    "Global energy shock"
+   ],
+   "sources": [
+    [
+     "Reuters: Attacks on Saudi oil facilities knock out half supply (2019)",
+     "https://www.reuters.com/article/us-saudi-aramco-fire/houthi-drones-hit-saudi-oil-heartland-sources-say-crude-flows-disrupted-idUSKCN1VZ01N/"
+    ],
+    [
+     "Reuters: Attack leaves world without spare capacity",
+     "https://www.reuters.com/article/economy/attack-on-saudi-leaves-world-without-spare-oil-capacity-idUSKBN1W106R/"
+    ],
+    [
+     "IEA: Strait of Hormuz",
+     "https://www.iea.org/about/oil-security-and-emission/strait-of-hormuz"
+    ]
+   ]
+  },
+  {
+   "id": "ir-barrage",
+   "tid": "us-iran",
+   "kind": "barrage",
+   "title": "Iranian missile barrage on US bases",
+   "short": "Missiles at US bases",
+   "claim": "Precedent: on 23 Jun 2025 Iran fired 19 missiles at Al Udeid, Qatar; Qatar said 18 were intercepted and one landed inside the base without casualties (Qatar MoD via Janes/Al Jazeera).",
+   "trigger": "al udeid|us bases?|us base|ballistic missiles? at|retaliat",
+   "weapon": "Short- and medium-range ballistic missiles",
+   "origin": {
+    "name": "Western Iran (illustrative)",
+    "lat": 34.3,
+    "lon": 47.1
+   },
+   "targets": [
+    {
+     "name": "Al Udeid Air Base",
+     "lat": 25.117,
+     "lon": 51.315
+    },
+    {
+     "name": "NSA Bahrain",
+     "lat": 26.21,
+     "lon": 50.6
+    },
+    {
+     "name": "Al Dhafra Air Base",
+     "lat": 24.248,
+     "lon": 54.548
+    },
+    {
+     "name": "Ain al-Asad",
+     "lat": 33.785,
+     "lon": 42.441
+    }
+   ],
+   "cities": [
+    [
+     "Doha",
+     25.29,
+     51.53
+    ],
+    [
+     "Manama",
+     26.23,
+     50.59
+    ],
+    [
+     "Abu Dhabi",
+     24.45,
+     54.38
+    ],
+    [
+     "Baghdad",
+     33.31,
+     44.36
+    ]
+   ],
+   "effects": [
+    [
+     "Oil",
+     "mixed",
+     "Brent fell 7% after the limited 2025 attack (Reuters) — markets react to whether retaliation is contained."
+    ],
+    [
+     "Air travel",
+     "down",
+     "Gulf airspace closures (Qatar, Bahrain, UAE) as in June 2025."
+    ],
+    [
+     "Escalation",
+     "up",
+     "US casualties would sharply raise pressure for wider strikes."
+    ]
+   ],
+   "ladder": [
+    "Strike on Iran",
+    "Iranian missiles at US bases",
+    "Interceptions / damage",
+    "US response",
+    "Ceasefire or wider war"
+   ],
+   "sources": [
+    [
+     "Reuters: Iran fires missiles at US base in Qatar",
+     "https://www.reuters.com/world/middle-east/iran-weighs-retaliation-against-us-strikes-nuclear-sites-2025-06-23/"
+    ],
+    [
+     "Janes: Qatari, US air defences defeat Iranian attack",
+     "https://www.janes.com/defence-intelligence-insights/defence-news/weapons/qatari-us-air-defences-defeat-iranian-ballistic-missile-attack"
+    ],
+    [
+     "Al Jazeera: Tehran attacks US base in Qatar",
+     "https://www.aljazeera.com/news/2025/6/23/flares-over-qatars-doha-explosions-heard-amid-us-israel-iran-conflict"
+    ]
+   ]
+  },
+  {
+   "id": "il-haifa",
+   "tid": "israel-gaza-lebanon",
+   "kind": "rockets",
+   "title": "Large Hezbollah rocket barrage on Haifa",
+   "short": "Rockets on Haifa",
+   "claim": "Precedent: in Oct 2024 Hezbollah fired heavy rocket salvos at Haifa, including the first direct hits on the city (Reuters, 6 Oct 2024).",
+   "trigger": "hezbollah|haifa|rockets?",
+   "weapon": "Unguided rockets and some guided missiles",
+   "origin": {
+    "name": "South Lebanon",
+    "lat": 33.27,
+    "lon": 35.4
+   },
+   "targets": [
+    {
+     "name": "Haifa",
+     "lat": 32.79,
+     "lon": 34.99
+    },
+    {
+     "name": "Krayot",
+     "lat": 32.84,
+     "lon": 35.08
+    },
+    {
+     "name": "Haifa Bay",
+     "lat": 32.81,
+     "lon": 35.03
+    }
+   ],
+   "cities": [
+    [
+     "Haifa",
+     32.79,
+     34.99
+    ],
+    [
+     "Nahariya",
+     33.0,
+     35.09
+    ],
+    [
+     "Acre",
+     32.93,
+     35.08
+    ],
+    [
+     "Tyre",
+     33.27,
+     35.2
+    ]
+   ],
+   "effects": [
+    [
+     "Civilians",
+     "up",
+     "Schools closed and shelters opened in northern Israel in 2024."
+    ],
+    [
+     "Escalation",
+     "up",
+     "Israeli retaliation on Beirut's Dahiyeh and south Lebanon likely."
+    ]
+   ],
+   "ladder": [
+    "Cross-border fire",
+    "Mass barrage on Haifa",
+    "Israeli air campaign in Lebanon",
+    "Ground incursion"
+   ],
+   "sources": [
+    [
+     "Reuters: Hezbollah rockets hit Haifa (2024)",
+     "https://www.reuters.com/world/middle-east/hezbollah-rockets-hit-israels-haifa-10-injured-2024-10-06/"
+    ]
+   ]
+  },
+  {
+   "id": "il-dahiyeh",
+   "tid": "israel-gaza-lebanon",
+   "kind": "airstrikes",
+   "title": "Israeli air campaign on Beirut's southern suburbs",
+   "short": "Strikes on Dahiyeh",
+   "claim": "Precedent: Israel's 2024 strikes on Dahiyeh, Beirut, including the Sept 2024 strike that killed Hassan Nasrallah.",
+   "trigger": "dahiyeh|beirut|lebanon",
+   "weapon": "Air-delivered precision munitions",
+   "origin": {
+    "name": "Israeli Air Force (illustrative)",
+    "lat": 32.4,
+    "lon": 34.6
+   },
+   "targets": [
+    {
+     "name": "Dahiyeh, Beirut",
+     "lat": 33.85,
+     "lon": 35.5
+    }
+   ],
+   "cities": [
+    [
+     "Beirut",
+     33.89,
+     35.5
+    ],
+    [
+     "Sidon",
+     33.56,
+     35.37
+    ],
+    [
+     "Jounieh",
+     33.98,
+     35.62
+    ]
+   ],
+   "effects": [
+    [
+     "Displacement",
+     "up",
+     "Mass displacement from southern Beirut as in autumn 2024."
+    ],
+    [
+     "Escalation",
+     "up",
+     "Hezbollah long-range fire at central Israel possible."
+    ]
+   ],
+   "ladder": [
+    "Targeted strikes",
+    "Wide air campaign",
+    "Hezbollah long-range fire",
+    "Ground operation"
+   ],
+   "sources": [
+    [
+     "Reuters: Hezbollah rockets hit Haifa (context of 2024 escalation)",
+     "https://www.reuters.com/world/middle-east/hezbollah-rockets-hit-israels-haifa-10-injured-2024-10-06/"
+    ]
+   ]
+  },
+  {
+   "id": "ru-oreshnik",
+   "tid": "russia-ukraine",
+   "kind": "irbm",
+   "title": "Oreshnik IRBM strike on Kyiv",
+   "short": "Oreshnik on Kyiv",
+   "claim": "Precedent: on 21 Nov 2024 Russia fired its new Oreshnik intermediate-range ballistic missile at Dnipro, launched from Astrakhan region ~700 km away, with multiple warheads (Reuters).",
+   "trigger": "oreshnik|ballistic|kyiv",
+   "weapon": "Oreshnik IRBM (conventional warheads assumed)",
+   "origin": {
+    "name": "Kapustin Yar / Astrakhan region",
+    "lat": 48.58,
+    "lon": 45.72
+   },
+   "targets": [
+    {
+     "name": "Kyiv (city-level, illustrative)",
+     "lat": 50.45,
+     "lon": 30.52
+    }
+   ],
+   "cities": [
+    [
+     "Kyiv",
+     50.45,
+     30.52
+    ],
+    [
+     "Bila Tserkva",
+     49.8,
+     30.11
+    ],
+    [
+     "Zhytomyr",
+     50.25,
+     28.66
+    ]
+   ],
+   "effects": [
+    [
+     "Escalation",
+     "up",
+     "Russia framed Oreshnik as a warning to the West; NATO consultations likely."
+    ],
+    [
+     "Air defence",
+     "down",
+     "Few systems can intercept IRBM-class warheads."
+    ]
+   ],
+   "ladder": [
+    "Threats",
+    "IRBM strike",
+    "Western response / more air defence",
+    "Further strikes"
+   ],
+   "sources": [
+    [
+     "Reuters: Russia fired new ballistic missile at Ukraine (2024)",
+     "https://www.reuters.com/world/europe/russia-launches-intercontinental-ballistic-missile-attack-ukraine-kyiv-says-2024-11-21/"
+    ],
+    [
+     "Reuters: What is Oreshnik?",
+     "https://www.reuters.com/world/europe/what-is-russias-oreshnik-missile-2024-11-22/"
+    ]
+   ]
+  },
+  {
+   "id": "ru-grid",
+   "tid": "russia-ukraine",
+   "kind": "energy",
+   "title": "Winter strike wave on Ukraine's power grid",
+   "short": "Grid strike wave",
+   "claim": "Russia has repeatedly struck Ukrainian power infrastructure in winter; the IAEA has reported drone strikes affecting staff and power lines at nuclear plants.",
+   "trigger": "power (plant|grid)|energy|substation|blackout",
+   "weapon": "Mixed drones and cruise missiles",
+   "origin": {
+    "name": "Russia (illustrative)",
+    "lat": 51.7,
+    "lon": 39.2
+   },
+   "targets": [
+    {
+     "name": "Kyiv region grid",
+     "lat": 50.45,
+     "lon": 30.52
+    },
+    {
+     "name": "Kharkiv grid",
+     "lat": 49.99,
+     "lon": 36.23
+    },
+    {
+     "name": "Odesa grid",
+     "lat": 46.48,
+     "lon": 30.73
+    }
+   ],
+   "cities": [
+    [
+     "Kyiv",
+     50.45,
+     30.52
+    ],
+    [
+     "Kharkiv",
+     49.99,
+     36.23
+    ],
+    [
+     "Odesa",
+     46.48,
+     30.73
+    ]
+   ],
+   "effects": [
+    [
+     "Power",
+     "down",
+     "Rolling blackouts and heating loss for millions in winter."
+    ],
+    [
+     "Nuclear safety",
+     "up",
+     "IAEA warns about strikes near nuclear plants."
+    ]
+   ],
+   "ladder": [
+    "Drone waves",
+    "Combined missile strike",
+    "Grid failure",
+    "Retaliatory Ukrainian strikes on Russian refineries"
+   ],
+   "sources": [
+    [
+     "IAEA: Nuclear safety in Ukraine",
+     "https://www.iaea.org/newscenter/focus/ukraine"
+    ]
+   ]
+  },
+  {
+   "id": "ye-tanker",
+   "tid": "yemen-red-sea",
+   "kind": "antiship",
+   "title": "Houthi missile hits tanker in Bab el-Mandeb",
+   "short": "Tanker hit · Bab el-Mandeb",
+   "claim": "The Houthis have repeatedly attacked shipping since late 2023; CSIS notes tanker attacks can choke Saudi Arabia's Red Sea export route.",
+   "trigger": "houthi|red sea|tanker|bab el-mandeb|shipping",
+   "weapon": "Anti-ship ballistic / cruise missile",
+   "origin": {
+    "name": "Hodeidah coast",
+    "lat": 14.8,
+    "lon": 42.95
+   },
+   "targets": [
+    {
+     "name": "Bab el-Mandeb lane",
+     "lat": 12.6,
+     "lon": 43.3
+    }
+   ],
+   "cities": [
+    [
+     "Mocha",
+     13.32,
+     43.25
+    ],
+    [
+     "Djibouti",
+     11.59,
+     43.15
+    ],
+    [
+     "Aden",
+     12.79,
+     45.03
+    ]
+   ],
+   "effects": [
+    [
+     "Shipping",
+     "down",
+     "Bab el-Mandeb oil flows fell from 8.0 mb/d (2022) to ~4.1 mb/d (2024) as ships rerouted around the Cape (EIA)."
+    ],
+    [
+     "Oil",
+     "up",
+     "Tanker hits raise freight and insurance costs."
+    ]
+   ],
+   "ladder": [
+    "Threat to shipping",
+    "Tanker struck",
+    "US/UK strikes on Houthi sites",
+    "Wider Red Sea war"
+   ],
+   "sources": [
+    [
+     "CSIS: Global economic consequences of Red Sea attacks",
+     "https://www.csis.org/analysis/global-economic-consequences-attacks-red-sea-shipping-lanes"
+    ],
+    [
+     "EIA: World oil transit chokepoints",
+     "https://www.eia.gov/international/content/analysis/special_topics/World_Oil_Transit_Chokepoints/"
+    ]
+   ]
+  },
+  {
+   "id": "ye-hodeidah",
+   "tid": "yemen-red-sea",
+   "kind": "airstrikes",
+   "title": "US/Israeli strikes on Hodeidah port",
+   "short": "Strikes on Hodeidah",
+   "claim": "Hodeidah port and Ras Isa have been struck repeatedly since 2024 in response to Houthi attacks.",
+   "trigger": "hodeidah|ras isa|sanaa",
+   "weapon": "Air and naval strikes",
+   "origin": {
+    "name": "Red Sea (illustrative)",
+    "lat": 17.5,
+    "lon": 39.5
+   },
+   "targets": [
+    {
+     "name": "Hodeidah port",
+     "lat": 14.8,
+     "lon": 42.95
+    },
+    {
+     "name": "Ras Isa terminal",
+     "lat": 15.12,
+     "lon": 42.83
+    }
+   ],
+   "cities": [
+    [
+     "Hodeidah",
+     14.8,
+     42.95
+    ],
+    [
+     "Sanaa",
+     15.37,
+     44.19
+    ]
+   ],
+   "effects": [
+    [
+     "Humanitarian",
+     "up",
+     "Hodeidah handles much of Yemen's food and fuel imports."
+    ],
+    [
+     "Escalation",
+     "up",
+     "Houthi retaliation on Israel and shipping."
+    ]
+   ],
+   "ladder": [
+    "Houthi attacks",
+    "Strikes on ports",
+    "Houthi missiles on Israel",
+    "Sustained campaign"
+   ],
+   "sources": [
+    [
+     "CSIS: Houthi aggression and a roadmap for peace",
+     "https://www.csis.org/analysis/houthi-aggression-and-roadmap-peace-yemen"
+    ]
+   ]
+  },
+  {
+   "id": "pk-sindoor",
+   "tid": "pakistan-india",
+   "kind": "barrage",
+   "title": "Renewed India–Pakistan missile exchange",
+   "short": "Strike & counter-strike",
+   "claim": "Precedent: on 7 May 2025 India's Operation Sindoor struck nine sites in Pakistan and Pakistan-administered Kashmir; Pakistan said six locations were hit and retaliated (Reuters).",
+   "trigger": "line of control|kashmir|sindoor|india.*pakistan|pakistan.*india",
+   "weapon": "Stand-off missiles and drones (illustrative)",
+   "origin": {
+    "name": "Northern India (illustrative)",
+    "lat": 31.0,
+    "lon": 75.8
+   },
+   "targets": [
+    {
+     "name": "Bahawalpur (hit 2025)",
+     "lat": 29.4,
+     "lon": 71.68
+    },
+    {
+     "name": "Muridke (hit 2025)",
+     "lat": 31.8,
+     "lon": 74.26
+    },
+    {
+     "name": "Muzaffarabad (hit 2025)",
+     "lat": 34.37,
+     "lon": 73.47
+    }
+   ],
+   "cities": [
+    [
+     "Lahore",
+     31.55,
+     74.34
+    ],
+    [
+     "Islamabad",
+     33.69,
+     73.05
+    ],
+    [
+     "Amritsar",
+     31.63,
+     74.87
+    ],
+    [
+     "Srinagar",
+     34.08,
+     74.8
+    ]
+   ],
+   "effects": [
+    [
+     "Escalation",
+     "up",
+     "Both states are nuclear-armed; 2025 fighting ended in a ceasefire after four days."
+    ],
+    [
+     "Airspace",
+     "down",
+     "Mutual airspace closures, as in 2025."
+    ]
+   ],
+   "ladder": [
+    "Militant attack",
+    "Indian strikes",
+    "Pakistani retaliation",
+    "Drone/missile exchanges",
+    "Ceasefire or escalation"
+   ],
+   "sources": [
+    [
+     "Reuters: What targets did India say it destroyed?",
+     "https://www.reuters.com/world/asia-pacific/what-were-targets-india-destroyed-its-strikes-pakistan-2025-05-07/"
+    ],
+    [
+     "Reuters: India-Pakistan, Operation Sindoor",
+     "https://www.reuters.com/world/india-strikes-pakistan-with-missiles-pakistan-says-it-will-retaliate-2025-05-06/"
+    ]
+   ]
+  },
+  {
+   "id": "pk-indus",
+   "tid": "pakistan-india",
+   "kind": "water",
+   "title": "India restricts Indus river flows",
+   "short": "Indus waters cut",
+   "claim": "India suspended the Indus Waters Treaty in April 2025; Pakistan said any attempt to stop or divert its water would be treated as an \"act of war\" (Reuters).",
+   "trigger": "indus|water treaty|chenab|jhelum",
+   "weapon": "Dams / flow control (non-kinetic)",
+   "origin": {
+    "name": "Chenab & Jhelum headwaters",
+    "lat": 33.3,
+    "lon": 75.4
+   },
+   "targets": [
+    {
+     "name": "Punjab plains (Pakistan)",
+     "lat": 31.0,
+     "lon": 72.5
+    }
+   ],
+   "cities": [
+    [
+     "Lahore",
+     31.55,
+     74.34
+    ],
+    [
+     "Multan",
+     30.2,
+     71.47
+    ],
+    [
+     "Faisalabad",
+     31.42,
+     73.08
+    ]
+   ],
+   "effects": [
+    [
+     "Agriculture",
+     "down",
+     "Pakistan's farm economy depends heavily on Indus-system water."
+    ],
+    [
+     "Escalation",
+     "up",
+     "Pakistan has framed diversion as a casus belli."
+    ]
+   ],
+   "ladder": [
+    "Treaty suspended (Apr 2025)",
+    "Flow restriction projects",
+    "Pakistani legal / military warnings",
+    "Crisis"
+   ],
+   "sources": [
+    [
+     "Reuters: What is the Indus Waters Treaty?",
+     "https://www.reuters.com/world/asia-pacific/what-is-indus-waters-treaty-between-india-pakistan-2025-04-24/"
+    ],
+    [
+     "Reuters: Panic in Pakistan as India vows to cut off water",
+     "https://www.reuters.com/world/asia-pacific/panic-pakistan-india-vows-cut-off-water-supply-over-kashmir-2025-04-27/"
+    ]
+   ]
+  },
+  {
+   "id": "tw-blockade",
+   "tid": "china-taiwan",
+   "kind": "blockade",
+   "title": "PLA blockade / quarantine of Taiwan",
+   "short": "Blockade of Taiwan",
+   "claim": "CSIS ChinaPower and the CSIS 'Lights Out?' wargame study how China could blockade Taiwan, from coast-guard 'quarantine' to an all-out kinetic blockade.",
+   "trigger": "blockade|quarantine|strait|pla|drills",
+   "weapon": "Navy, coast guard, missiles (illustrative)",
+   "origin": {
+    "name": "Fujian coast",
+    "lat": 25.5,
+    "lon": 119.79
+   },
+   "targets": [
+    {
+     "name": "Off Keelung",
+     "lat": 25.4,
+     "lon": 122.0
+    },
+    {
+     "name": "Off Kaohsiung",
+     "lat": 22.3,
+     "lon": 119.9
+    },
+    {
+     "name": "East of Hualien",
+     "lat": 24.0,
+     "lon": 122.2
+    },
+    {
+     "name": "Taiwan Strait",
+     "lat": 24.3,
+     "lon": 119.6
+    }
+   ],
+   "cities": [
+    [
+     "Taipei",
+     25.03,
+     121.57
+    ],
+    [
+     "Kaohsiung",
+     22.62,
+     120.3
+    ],
+    [
+     "Taichung",
+     24.15,
+     120.67
+    ],
+    [
+     "Xiamen",
+     24.48,
+     118.09
+    ]
+   ],
+   "effects": [
+    [
+     "Chips",
+     "down",
+     "Taiwan makes most of the world's advanced semiconductors; supply chains would seize."
+    ],
+    [
+     "Energy",
+     "down",
+     "Taiwan imports almost all its energy; CSIS wargame examines how long it could hold out."
+    ],
+    [
+     "Escalation",
+     "up",
+     "US and Japan involvement risk (CSIS)."
+    ]
+   ],
+   "ladder": [
+    "Large drills",
+    "Coast-guard 'quarantine'",
+    "Declared blockade",
+    "Mines / missile strikes",
+    "US–China war risk"
+   ],
+   "sources": [
+    [
+     "CSIS ChinaPower: How China could blockade Taiwan",
+     "https://features.csis.org/chinapower/china-blockade-taiwan/"
+    ],
+    [
+     "CSIS: Lights Out? Wargaming a Chinese blockade",
+     "https://www.csis.org/analysis/lights-out-wargaming-chinese-blockade-taiwan"
+    ]
+   ]
+  },
+  {
+   "id": "tw-salvo",
+   "tid": "china-taiwan",
+   "kind": "barrage",
+   "title": "PLA missile salvo into waters around Taiwan",
+   "short": "Missiles around Taiwan",
+   "claim": "Precedent: in Aug 2022 the PLA fired ballistic missiles into zones around Taiwan during large-scale drills.",
+   "trigger": "missile|drills|pla",
+   "weapon": "Ballistic missiles (test splashdowns, illustrative)",
+   "origin": {
+    "name": "Fujian / Zhejiang",
+    "lat": 26.5,
+    "lon": 118.5
+   },
+   "targets": [
+    {
+     "name": "North-east zone",
+     "lat": 25.8,
+     "lon": 122.6
+    },
+    {
+     "name": "East zone",
+     "lat": 23.6,
+     "lon": 122.4
+    },
+    {
+     "name": "South-west zone",
+     "lat": 22.0,
+     "lon": 119.6
+    }
+   ],
+   "cities": [
+    [
+     "Taipei",
+     25.03,
+     121.57
+    ],
+    [
+     "Hualien",
+     23.99,
+     121.6
+    ],
+    [
+     "Kaohsiung",
+     22.62,
+     120.3
+    ]
+   ],
+   "effects": [
+    [
+     "Shipping",
+     "down",
+     "Ships and flights reroute around closure zones."
+    ],
+    [
+     "Escalation",
+     "up",
+     "Signals rehearsal for blockade."
+    ]
+   ],
+   "ladder": [
+    "Drills announced",
+    "Missile splashdowns",
+    "Exclusion zones",
+    "Blockade"
+   ],
+   "sources": [
+    [
+     "CSIS ChinaPower: How China could blockade Taiwan",
+     "https://features.csis.org/chinapower/china-blockade-taiwan/"
+    ]
+   ]
+  },
+  {
+   "id": "kr-test",
+   "tid": "koreas",
+   "kind": "nuketest",
+   "title": "North Korean seventh nuclear test",
+   "short": "7th nuclear test",
+   "claim": "Precedent: North Korea's sixth test at Punggye-ri on 3 Sep 2017 registered as a magnitude 6.3 event (USGS).",
+   "trigger": "nuclear test|punggye|nuclear",
+   "weapon": "Underground nuclear test",
+   "origin": {
+    "name": "Punggye-ri",
+    "lat": 41.28,
+    "lon": 129.08
+   },
+   "targets": [
+    {
+     "name": "Punggye-ri test site",
+     "lat": 41.28,
+     "lon": 129.08
+    }
+   ],
+   "underground": true,
+   "cities": [
+    [
+     "Kilju",
+     40.96,
+     129.33
+    ],
+    [
+     "Chongjin",
+     41.8,
+     129.78
+    ],
+    [
+     "Hamhung",
+     39.92,
+     127.54
+    ]
+   ],
+   "effects": [
+    [
+     "Sanctions",
+     "up",
+     "New UN/US sanctions pressure."
+    ],
+    [
+     "Escalation",
+     "up",
+     "ROK–US–Japan drills and strategic asset deployments."
+    ]
+   ],
+   "ladder": [
+    "Test-site activity",
+    "Underground test",
+    "Sanctions & drills",
+    "Missile launches"
+   ],
+   "sources": [
+    [
+     "38 North: Sixth nuclear test at Punggye-ri",
+     "https://www.38north.org/2017/09/nuke090317/"
+    ],
+    [
+     "IRIS: 2017 North Korean nuclear test",
+     "https://ds.iris.edu/ds/nodes/dmc/specialevents/2017/09/03/2017-north-korean-nuclear-test/"
+    ]
+   ]
+  },
+  {
+   "id": "kr-yeonpyeong",
+   "tid": "koreas",
+   "kind": "shelling",
+   "title": "Artillery shelling of a border island",
+   "short": "Island shelled",
+   "claim": "Precedent: on 23 Nov 2010 North Korea shelled Yeonpyeong Island, killing two South Korean marines and two civilians (BBC/Reuters).",
+   "trigger": "yeonpyeong|nll|artillery|border",
+   "weapon": "Artillery",
+   "origin": {
+    "name": "North Korean coast",
+    "lat": 37.85,
+    "lon": 125.6
+   },
+   "targets": [
+    {
+     "name": "Yeonpyeong Island",
+     "lat": 37.66,
+     "lon": 125.7
+    }
+   ],
+   "cities": [
+    [
+     "Incheon",
+     37.46,
+     126.7
+    ],
+    [
+     "Seoul",
+     37.57,
+     126.98
+    ],
+    [
+     "Haeju",
+     38.04,
+     125.71
+    ]
+   ],
+   "effects": [
+    [
+     "Escalation",
+     "up",
+     "South Korea returned fire in 2010; a repeat could trigger air strikes."
+    ],
+    [
+     "Markets",
+     "down",
+     "Won and Korean stocks typically dip on border clashes."
+    ]
+   ],
+   "ladder": [
+    "Border incident",
+    "Shelling",
+    "Counter-battery fire",
+    "Air strikes"
+   ],
+   "sources": [
+    [
+     "BBC: North Korean artillery hits South Korean island (2010)",
+     "https://www.bbc.com/news/world-asia-pacific-11818005"
+    ],
+    [
+     "Reuters: North Korea shells South in fiercest attack in decades",
+     "https://www.reuters.com/article/world/us/north-korea-shells-south-in-fiercest-attack-in-decades-idUSTRE6AM0YS/"
+    ]
+   ]
+  }
+ ]
+}

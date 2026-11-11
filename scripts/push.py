@@ -18,7 +18,7 @@ TOPIC = 'fl-sub-f11ebc9ad43b6dd3b99316cf'
 SUB_CLAIM = 'mailto:WajeehK@users.noreply.github.com'
 PUSH_HOSTS = re.compile(r'^https://([a-z0-9-]+\.)*(push\.apple\.com|fcm\.googleapis\.com|googleapis\.com|push\.services\.mozilla\.com|notify\.windows\.com)(/|$)')
 MAX_PER_HOUR, MAX_DEVICES = 4, 12
-KIN = {'missile', 'drone', 'air', 'naval', 'ground'}
+KIN = {'missile', 'drone', 'air', 'naval', 'ground', 'mine'}
 ICON = {'missile': '🚀', 'drone': '🛩️', 'air': '✈️', 'naval': '⚓', 'ground': '💥'}
 NAME = {'missile': 'Missile attack', 'drone': 'Drone attack', 'air': 'Airstrike', 'naval': 'Naval incident', 'ground': 'Ground fighting'}
 BANDS = [(15, 'CALM'), (35, 'TENSE'), (60, 'ELEVATED'), (80, 'HIGH'), (101, 'SEVERE')]
@@ -121,7 +121,7 @@ def main():
             for c in CL.get(tid, []):
                 if c['cid'] in d['sent'] or now - c['ts'] > 4 * 3600: continue
                 if any(nurl(o.get('url', '')) in set(d.get('surl', [])) for o in c.get('outlets', [])): d['sent'].append(c['cid']); continue
-                if c['type'] in KIN and c['sev'] >= 3: cands.append((c['sev'], tid, c))
+                if c['type'] in KIN and c['sev'] >= 3 and not c.get('lowrel'): cands.append((c['sev'], tid, c))
         cands.sort(key=lambda x: (-x[0], -x[2]['ts']))
         for sev, tid, c in cands:
             if quiet and sev < 5: continue

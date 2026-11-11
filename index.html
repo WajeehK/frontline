@@ -47,7 +47,7 @@
 <button id="hudTab" class="glass hudtab" aria-label="Show the top panel" aria-expanded="false"><span id="hudTabT">–</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
 <div id="brkMini" role="alert"></div>
 
-<div id="fabs"><button id="fabBell" class="glass fab" aria-label="Alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></button><button id="fabOpts" class="glass fab" aria-label="Map layers"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></button></div>
+<div id="fabs"><button id="fabScen" class="glass fab" aria-label="What-if scenarios"><svg viewBox="0 0 24 24"><path d="M9 3h6M10 3v6L4.5 19a1.5 1.5 0 0 0 1.3 2h12.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M7 15h10"/></svg></button><button id="fabBell" class="glass fab" aria-label="Alerts"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg></button><button id="fabOpts" class="glass fab" aria-label="Map layers"><svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg></button></div>
 <section id="ticker" class="glass" aria-live="polite"></section>
 <p id="note">Animations are symbolic of reported events, not real positions. <a href="#" id="noteMore">How it works</a></p>
 
@@ -64,6 +64,8 @@
 </section>
 
 <aside id="sides" class="sheet glass" aria-label="Sides scoreboard"><div class="grab"></div><div class="shead"><h2>Sides · reported events</h2></div><div id="sidesBody" class="slist"><div class="skel"><i></i><i></i></div><div class="skel"><i></i><i></i></div><div class="skel"><i></i><i></i></div><div class="skel"><i></i><i></i></div></div></aside>
+<aside id="scen" class="sheet glass" aria-label="Scenarios"><div class="grab"></div><div class="shead"><h2>What-if scenarios <span class="hypo">HYPOTHETICAL</span></h2></div><div id="scenBody" class="slist prose"></div></aside>
+<div id="scFlash"></div><div id="scBar" aria-live="polite"><b>⚠ HYPOTHETICAL · SIMULATION</b><span id="scBarT"></span><button id="scBarX" aria-label="End simulation">✕</button></div>
 <aside id="opts" class="sheet glass" aria-label="Layers and alerts"><div class="grab"></div><div class="shead"><h2>Alerts & layers</h2></div><div id="optsBody" class="slist prose"></div></aside>
 <div id="brk" aria-live="assertive"></div>
 <article id="story" class="sheet glass" aria-label="Story" aria-modal="true"></article>

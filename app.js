@@ -6,12 +6,12 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const RMQ = matchMedia('(prefers-reduced-motion: reduce)');
 const DESK = matchMedia('(min-width: 900px)');
-const KIN = new Set(['missile', 'drone', 'air', 'naval', 'ground']);
-const HALF = new Set(['deploy', 'threat', 'cyber', 'sanctions']);
+const KIN = new Set(['missile', 'drone', 'air', 'naval', 'ground', 'mine']);
+const HALF = new Set(['deploy', 'threat', 'cyber', 'sanctions', 'blast']);
 const W5 = [0, 1, 2, 4, 8, 16];
 const TY = {
   missile: ['MISSILE', '🚀', '#ff6a2b'], drone: ['DRONE', '🛩️', '#ff9a3c'], air: ['AIRSTRIKE', '✈️', '#ff5a3a'], naval: ['NAVAL', '⚓', '#4fd1ff'],
-  ground: ['GROUND', '💥', '#ff7b54'], cyber: ['CYBER', '🖥️', '#3dff9a'], deploy: ['DEPLOYMENT', '🛫', '#8fb8ff'], sanctions: ['SANCTIONS', '💲', '#ffd166'],
+  ground: ['GROUND', '💥', '#ff7b54'], mine: ['MINE / SHIP HIT', '💣', '#4fd1ff'], blast: ['INCIDENT', '💥', '#ff9a6a'], legal: ['LEGAL / ARREST', '⚖️', '#9fb4ff'], cyber: ['CYBER', '🖥️', '#3dff9a'], deploy: ['DEPLOYMENT', '🛫', '#8fb8ff'], sanctions: ['SANCTIONS', '💲', '#ffd166'],
   threat: ['THREAT', '⚠️', '#ffc04d'], statement: ['STATEMENT', '🗣️', '#c9ced6'], diplomacy: ['DIPLOMACY', '🕊️', '#ffffff'],
 };
 const GLY = { air: '✈', naval: '⚓', nuclear: '☢', capital: '★', base: '■', oil: '◆', area: '●', city: '●' };
@@ -268,6 +268,35 @@ function floatIcon(map, p, color, size = .5, dur = 3600) {
   const s = add(sprite(map, new THREE.Color(color), size, false)); s.position.copy(p);
   fade(s, s.material, dur, t => { s.material.opacity = Math.sin(Math.min(1, t * 1.3) * Math.PI) * .95; s.position.y = p.y + .25 + t * .7; s.position.x = p.x + Math.sin(t * 6) * .05; });
 }
+// ---- v9 per-type visuals: each report type gets its own symbol so a claim never looks like a strike
+const BUBBLE = tex((g, n) => { g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 6; g.beginPath(); g.roundRect(n * .12, n * .18, n * .76, n * .5, n * .14); g.fill(); g.beginPath(); g.moveTo(n * .3, n * .66); g.lineTo(n * .24, n * .86); g.lineTo(n * .46, n * .66); g.fill();
+  g.shadowBlur = 0; g.fillStyle = '#222'; for (let i = 0; i < 3; i++) { g.beginPath(); g.arc(n * (.34 + i * .16), n * .43, n * .045, 0, 7); g.fill(); } }, 96);
+const WARN = tex((g, n) => { g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 6; g.beginPath(); g.moveTo(n / 2, n * .1); g.lineTo(n * .92, n * .86); g.lineTo(n * .08, n * .86); g.closePath(); g.fill();
+  g.shadowBlur = 0; g.fillStyle = '#222'; g.fillRect(n * .46, n * .35, n * .08, n * .28); g.fillRect(n * .46, n * .69, n * .08, n * .08); }, 96);
+const BADGE = tex((g, n) => { g.fillStyle = '#fff'; g.shadowColor = '#fff'; g.shadowBlur = 6; g.beginPath(); g.moveTo(n / 2, n * .06); g.lineTo(n * .86, n * .2); g.lineTo(n * .8, n * .6); g.quadraticCurveTo(n * .7, n * .84, n / 2, n * .95); g.quadraticCurveTo(n * .3, n * .84, n * .2, n * .6); g.lineTo(n * .14, n * .2); g.closePath(); g.fill();
+  g.shadowBlur = 0; g.strokeStyle = '#222'; g.lineWidth = n * .045; g.beginPath(); g.moveTo(n * .5, n * .26); g.lineTo(n * .5, n * .72); g.moveTo(n * .3, n * .36); g.lineTo(n * .7, n * .36); g.moveTo(n * .38, n * .72); g.lineTo(n * .62, n * .72); g.stroke();
+  for (const x of [.3, .7]) { g.beginPath(); g.arc(n * x, n * .5, n * .09, 0, Math.PI); g.stroke(); } }, 96);
+const DASH = tex((g, n) => { g.strokeStyle = '#fff'; g.lineWidth = n * .03; g.setLineDash([n * .07, n * .05]); g.beginPath(); g.arc(n / 2, n / 2, n * .46, 0, 7); g.stroke(); }, 128);
+const SQ = tex((g, n) => { g.fillStyle = '#fff'; g.fillRect(n * .1, n * .35, n * .8, n * .3); }, 32);
+function speechPulse(p, color) { // statement: speech bubble rising with quick sound-wave arcs
+  floatIcon(BUBBLE, p.clone().setY(p.y + .12), color, .42, 3400); ringPulse(p, new THREE.Color(color).getHex(), .9, 1100, 4, 260); }
+function warnRing(p, color = 0xffc04d) { // threat: rotating dashed warning ring + hazard sign, no impact
+  const m = new THREE.MeshBasicMaterial({ map: DASH, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const r = add(new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), m)); r.position.copy(p).y += .04;
+  fade(r, m, 3600, t => { r.rotation.y = t * 2.4; const k = 1.6 + Math.sin(t * Math.PI * 6) * .08; r.scale.setScalar(k); m.opacity = Math.sin(Math.min(1, t * 1.4) * Math.PI) * .9; });
+  floatIcon(WARN, p.clone().setY(p.y + .15), color, .4, 3600); ringPulse(p, color, 1.9, 1600, 3, 700); }
+function legalBadge(p, color = 0x9fb4ff) { // legal / arrest: badge drops in, single slow ring
+  const s = add(sprite(BADGE, new THREE.Color(color), .46, false)); s.position.copy(p); s.position.y += 1.2;
+  fade(s, s.material, 3800, t => { const u = Math.min(1, t / .22); s.position.y = p.y + .35 + (1 - u) ** 2 * .9; s.material.opacity = t < .85 ? 1 : (1 - t) / .15; s.scale.setScalar(.46 * (u < 1 ? 1 : 1 + Math.sin((t - .22) * 30) * .04 * (1 - t))); });
+  setTimeout(() => ringPulse(p, color, 1.2, 1600, 1), 800); }
+function mineHit(p, sev, color) { // ship moving on the water, then a mine blast under the hull: water spout + fire
+  ships(p, color, Math.min(2, sev)); setTimeout(() => { explosion(p, Math.max(2, sev), 0xffa040); beamUp(p, 0xbfe9ff, 1600, 1.4); ringPulse(p, 0x4fd1ff, 1.4, 1800, 3, 300); }, 1500); }
+function glitch(p, color = 0x3dff9a) { // cyber: digital glitch blocks flickering around the target
+  const st = performance.now(); const bs = [];
+  for (let i = 0; i < (Q.low ? 10 : 22); i++) { const b = add(sprite(SQ, new THREE.Color(i % 3 ? color : 0xff3dd6), .12 + Math.random() * .25)); b.position.set(p.x + (Math.random() - .5) * 1.2, p.y + .1 + Math.random() * .6, p.z + (Math.random() - .5) * 1.2); bs.push(b); }
+  fx.push(now => { const t = (now - st) / 2600; if (t >= 1) { bs.forEach(b => { world.remove(b); b.material.dispose(); }); return false; }
+    for (const b of bs) { if (Math.random() < .3) { b.visible = Math.random() > .35; b.position.x += (Math.random() - .5) * .08; } b.material.opacity = (1 - t) * .9; } return true; });
+  ringPulse(p, color, 1.4, 1500, 3, 300); }
 function jetMesh(color) { const sh = new THREE.Shape(); sh.moveTo(0, .14); sh.lineTo(.07, -.08); sh.lineTo(0, -.04); sh.lineTo(-.07, -.08); sh.closePath(); const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true })); }
 function jets(from, to, color, sev, onHit) {
   const dir = to.clone().sub(from).setY(0).normalize(); const alt = 1.1; const n = sev >= 4 ? 3 : 2; const start = to.clone().addScaledVector(dir, -6), end = to.clone().addScaledVector(dir, 5);
@@ -359,10 +388,14 @@ function play(e, { fly = true } = {}) {
     case 'air': jets(from || to.clone().add(new THREE.Vector3(-3, 0, 1)), to, col, e.sev); break;
     case 'naval': ships(to, col, e.sev); if (e.sev >= 3) setTimeout(() => explosion(to, e.sev - 1, 0xff9050), 1600); break;
     case 'ground': artillery(to, e.sev); break;
-    case 'cyber': ringPulse(to, 0x3dff9a, 1.6, 1800, 4, 350); beamUp(to, 0x3dff9a, 2400, 1.2); break;
+    case 'cyber': glitch(to); break;
+    case 'mine': mineHit(to, e.sev, col); break;
+    case 'blast': explosion(to, Math.max(1, e.sev - 1), 0xff9a6a); break; // reported blast, attacker not stated: no launch path drawn
+    case 'legal': legalBadge(to); break;
     case 'deploy': { const o = from || to; const d = o.clone().add(new THREE.Vector3(1.6, 0, -1.2)); d.y = hAt(d.x, d.z); projectile(arcPath(o, d, .2), { color: col, dur: 2600, size: .07 }); ringPulse(o, col, 1.2, 2000, 2); break; }
     case 'sanctions': ringPulse(to, 0xffd166, 2.2, 3000, 3, 700); break;
-    case 'threat': ringPulse(to, 0xffc04d, 1.8, 1800, 4, 450); beamUp(to, 0xffc04d, 2400, 1); break;
+    case 'threat': warnRing(to); break;
+    case 'statement': speechPulse(to, 0xc9ced6); break;
     case 'diplomacy': ringPulse(to, 0xffffff, 2.6, 4200, 3, 1100); beamUp(to, 0xffffff, 4200, 2.2); floatIcon(e.title.match(/ceasefire|truce/i) ? FLAG : DOVE, to.clone().setY(to.y + .2), 0xffffff, .55, 4200); break;
     default: ringPulse(to, 0xc9ced6, 1.4, 2000, 2, 600);
   }
@@ -522,7 +555,7 @@ function go(i) {
   $('#about').classList.toggle('open', i === 4);
   $('#sides').classList.toggle('open', i === 2);
   $('#replay').classList.toggle('open', i === 3);
-  $('#thSheet').classList.remove('open'); $('#opts').classList.remove('open'); $('#sentS').classList.remove('open');
+  $('#thSheet').classList.remove('open'); $('#opts').classList.remove('open'); $('#sentS').classList.remove('open'); $('#scen').classList.remove('open');
   $('#ticker').classList.toggle('hide', i !== 0 && !(DESK.matches && i === 1));
   $('#scrim').classList.toggle('on', (i === 1 && !DESK.matches) || i === 4 || i === 2);
   if (i === 1) renderFeed();
@@ -537,7 +570,10 @@ $('#noteMore').addEventListener('click', e => { e.preventDefault(); go(4); });
 // ---------------------------------------------------------------- theatre picker + about
 $('#thBtn').addEventListener('click', () => {
   const ix = S.index; const th = (ix?.theatres || []).slice().sort((a, b) => b.esc24 - a.esc24 || b.n7 - a.n7);
-  $('#thList').innerHTML = th.map(t => { const lv = LV.find(l => t.esc24 < l[0]); return `<button class="th${t.id === S.tid ? ' cur' : ''}" data-t="${t.id}"><span><b>${esc(t.name)}</b><small>${t.n24} reports in 24h · ${t.k24} kinetic · ${t.n7} in 7d</small></span><span class="e" style="color:${lv[2]}">${t.esc24}<small style="font-size:9px;letter-spacing:.1em">${lv[1]}</small></span></button>`; }).join('');
+  const kindOf = t => t.kind || S.TH[t.id]?.kind || 'conflict';
+  const row = t => { const lv = LV.find(l => t.esc24 < l[0]); const ten = kindOf(t) === 'tension'; return `<button class="th${t.id === S.tid ? ' cur' : ''}${ten ? ' ten' : ''}" data-t="${t.id}"><span><b>${esc(t.name)}</b>${ten ? '<i class="tenTag">TENSIONS</i>' : ''}<small>${t.n24} reports in 24h · ${t.k24} kinetic · ${t.n7} in 7d</small></span><span class="e" style="color:${ten ? '#c9b37a' : lv[2]}">${t.esc24}<small style="font-size:9px;letter-spacing:.1em">${ten ? 'TENSION' : lv[1]}</small></span></button>`; };
+  const ac = th.filter(t => kindOf(t) !== 'tension'), te = th.filter(t => kindOf(t) === 'tension');
+  $('#thList').innerHTML = `<div class="thGrp">Active conflicts</div>` + ac.map(row).join('') + (te.length ? `<div class="thGrp ten">Tensions <small>· not at open war; same rules, quieter styling</small></div>` + te.map(row).join('') : '');
   $('#thSheet').classList.add('open'); $('#scrim').classList.add('on');
 });
 $('#thList').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (!b) return; $('#thSheet').classList.remove('open'); $('#scrim').classList.remove('on'); if (b.dataset.t !== S.tid) { location.hash = 't=' + b.dataset.t; loadTheatre(b.dataset.t); } });
@@ -557,7 +593,7 @@ function renderAbout() {
 const liveG = new THREE.Group(); world.add(liveG);
 const LAY = Object.assign({ air: true, naval: true, bases: true, pins: true }, JSON.parse(localStorage.getItem('fl_lay') || '{}'));
 let liveLabels = [];
-const isMajor = e => KIN.has(e.type) && (e.sev >= 4 || (e.sev >= 3 && ['missile', 'air', 'drone'].includes(e.type)));
+const isMajor = e => KIN.has(e.type) && !e.lowrel && !/zerohedge|infowars|gatewaypundit|naturalnews|globalresearch|activistpost|beforeitsnews|veteranstoday|southfront/i.test(e.outlet || '') && (e.sev >= 4 || (e.sev >= 3 && ['missile', 'air', 'drone'].includes(e.type)));
 function applyLayers() { markers.visible = LAY.bases; labels.forEach(l => { if (l.el.classList.contains('as')) l.dead2 = !LAY.bases; }); pinGroup.visible = LAY.pins; liveG.visible = LAY.air || LAY.naval; liveG.children.forEach(o => o.visible = LAY[o.userData.layer]); liveLabels.forEach(l => l.hide = !LAY[l.layer]); localStorage.setItem('fl_lay', JSON.stringify(LAY)); }
 const PLANE = (() => { const sh = new THREE.Shape(); sh.moveTo(0, .11); sh.lineTo(.02, .02); sh.lineTo(.09, -.02); sh.lineTo(.02, -.01); sh.lineTo(.015, -.07); sh.lineTo(.04, -.09); sh.lineTo(0, -.08); sh.lineTo(-.04, -.09); sh.lineTo(-.015, -.07); sh.lineTo(-.02, -.01); sh.lineTo(-.09, -.02); sh.lineTo(-.02, .02); sh.closePath(); const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return g; })();
 const HULL = (() => { const sh = new THREE.Shape(); sh.moveTo(0, .16); sh.lineTo(.035, .06); sh.lineTo(.035, -.12); sh.lineTo(-.035, -.12); sh.lineTo(-.035, .06); sh.closePath(); const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return g; })();
@@ -675,7 +711,7 @@ function breaking(e, force) {
   const where = P0.off ? cap(P0.where) + ' (off-map)' : P0.unk ? 'Location not stated' : cap(P0.where);
   const words = esc(e.title).split(' ').map((w, i) => `<span style="animation-delay:${1.15 + i * .07}s">${w}</span>`).join(' ');
   const el = $('#brk'); el.style.setProperty('--c', col);
-  el.innerHTML = `<div class="bk-scan"></div><div class="bk-grid"></div><div class="bk-radar"><i></i><b></b><em style="background:${side ? side.color : col}"></em></div>
+  el.innerHTML = `<div class="bk-scan"></div><div class="bk-grid"></div>${brkVis(e, col)}
    <div class="bk-top"><span class="bk-live">● BREAKING</span><span>${esc(S.th.name.toUpperCase())}</span></div>
    <div class="bk-mid"><div class="bk-kick"><span class="bk-ic">${ic}</span>${nm}${side ? ` <span class="bk-side" style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}</div>
     <h1 class="bk-h">${words}</h1>
@@ -687,14 +723,117 @@ function breaking(e, force) {
   el.onclick = end; setTimeout(end, RMQ.matches ? 1800 : 5200);
 }
 
+// ---------------------------------------------------------------- v9 scenarios: HYPOTHETICAL what-ifs, never mixed into the feed, alerts or sentiment
+let SCN = null; const SC = { on: null, objs: [], labs: [], timers: [] };
+async function loadScen() { if (!SCN) SCN = await getJSON('geo/scenarios.json').catch(() => ({ items: [] })); return SCN; }
+const hav = (a, b, c, d) => { const R = 6371, r = Math.PI / 180; const x = Math.sin((c - a) * r / 2) ** 2 + Math.cos(a * r) * Math.cos(c * r) * Math.sin((d - b) * r / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(x)); };
+// Cube-root scaling (Glasstone & Dolan 1977), coefficients calibrated so 15 kt gives Hiroshima-like ranges (5 psi ≈ 1.75 km). Estimates only.
+function nukeRadii(Y, surface) { const c = Y ** (1 / 3), f = surface ? .8 : 1; return [
+  ['Fireball', .075 * Y ** .4, '#fff1c4', 'vaporised / everything destroyed'],
+  ['20 psi heavy blast', .28 * c * f, '#ff4b3e', 'reinforced concrete buildings destroyed'],
+  ['5 psi moderate blast', .71 * c * f, '#ff9a3c', 'most residential buildings collapse; widespread deaths likely'],
+  ['3rd-degree burns', .63 * Y ** .41 * f, '#ffd166', 'thermal radiation, clear-weather estimate'],
+  ['1 psi light blast', 1.9 * c * f, '#8fb8ff', 'windows shatter; injuries from flying glass']]; }
+function scenTrigger(sc) { if (!sc.trigger) return null; const rx = new RegExp(sc.trigger, 'i'); const now = Date.now() / 1000;
+  return (S.events || []).filter(e => now - e.ts < 21 * 86400 && rx.test(e.title)).sort((a, b) => b.ts - a.ts)[0] || null; }
+async function openScen() {
+  const d = await loadScen(); const it = d.items.filter(x => x.tid === S.tid);
+  $('#scenBody').innerHTML = `<p class="scNote">${esc(d.note)}</p>` + (it.length ? it.map(sc => { const tr = scenTrigger(sc);
+    return `<div class="scCard"><div class="scK">${esc(sc.kind.toUpperCase())} · SIMULATION</div><b>${esc(sc.title)}</b><p>${esc(sc.claim)}</p>${tr ? `<a class="scTr" href="#e=${tr.id}" data-open="${tr.id}">↳ Triggered by: ${esc(tr.title)} <small>${esc(tr.outlet)} · ${ago(tr.ts)}</small></a>` : '<small class="dim">No matching report in the last 3 weeks</small>'}<button class="scGo" data-sc="${sc.id}">▶ Simulate</button></div>`; }).join('') : '<p class="dim">No scenarios for this theatre yet.</p>');
+  $('#scen').classList.add('open'); $('#scrim').classList.add('on');
+}
+$('#fabScen').addEventListener('click', openScen);
+$('#scenBody').addEventListener('click', e => { const g = e.target.closest('[data-sc]'); if (g) { runScen(SCN.items.find(x => x.id === g.dataset.sc)); return; }
+  const o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); const ev = S.events.find(x => x.id === o.dataset.open); if (ev) { $('#scen').classList.remove('open'); $('#scrim').classList.remove('on'); openStory(ev); } } });
+function scKm(lat, lon, km) { const a = ground(lat, lon), b = ground(lat + km / 111, lon); a.y = b.y = 0; return a.distanceTo(b); }
+function scClamp(lat, lon) { return ground(Math.min(BB[3] - .3, Math.max(BB[1] + .3, lat)), Math.min(BB[2] - .3, Math.max(BB[0] + .3, lon))); }
+function endScen() {
+  SC.timers.forEach(clearTimeout); SC.timers = []; SC.objs.forEach(o => { world.remove(o); o.material?.dispose?.(); }); SC.objs = [];
+  SC.labs.forEach(L => { L.dead = true; L.el.remove(); }); labels = labels.filter(l => !SC.labs.includes(l)); SC.labs = [];
+  SC.on = null; document.body.classList.remove('scen'); $('#scenFx')?.remove(); S.nextAt = performance.now() + 2500; homeCam();
+}
+$('#scBarX').addEventListener('click', endScen);
+const scT = (f, ms) => SC.timers.push(setTimeout(f, ms));
+function scRing(lat, lon, km, color, label, dashed) {
+  const R = scKm(lat, lon, km); const p = ground(lat, lon);
+  const m = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const r = add(new THREE.Mesh(RING2, m)); r.position.copy(p).y += .05; r.scale.setScalar(.001); SC.objs.push(r);
+  const fm = new THREE.MeshBasicMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+  const fill = add(new THREE.Mesh(DISC, fm)); fill.position.copy(p).y += .04; SC.objs.push(fill);
+  const st = performance.now(); fx.push(now => { if (!SC.objs.includes(r)) return false; const t = Math.min(1, (now - st) / 1400); const k = R * (1 - (1 - t) ** 3);
+    r.scale.setScalar(Math.max(.001, k)); fill.scale.setScalar(Math.max(.001, k)); m.opacity = .85; fm.opacity = .1 + .04 * Math.sin(now / 400); return true; });
+  if (label) { const L = addLabel(`<i style="color:${color}">◯</i> ${esc(label)} · ${km < 1 ? km.toFixed(2) : km.toFixed(1)} km <em>est.</em>`, 'scL', p.clone().add(new THREE.Vector3(R * .72, .05, R * .72)), 6, { ay: .5 }); SC.labs.push(L); }
+}
+function nukeFx(p, Y) {
+  const fl = $('#scFlash'); if (fl) { fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); }
+  const ball = add(sprite(GLOW, new THREE.Color(0xfff2c0), .2)); ball.position.copy(p); SC.objs.push(ball);
+  fade(ball, ball.material, 5200, t => { ball.scale.setScalar(.2 + 2.6 * Math.sqrt(t)); ball.material.color.setRGB(1, 1 - t * .5, .75 - t * .7); ball.material.opacity = (1 - t) ** .6; ball.position.y = p.y + t * 1.6; });
+  for (let i = 0; i < (Q.low ? 14 : 30); i++) { const stem = i < 10; const sm = add(sprite(SMOKE, new THREE.Color(stem ? 0x8a7a6a : 0xb09080), .4, false)); const a = Math.random() * 6.28, rr = Math.random();
+    sm.position.copy(p); sm.material.opacity = 0;
+    fade(sm, sm.material, 9000 + Math.random() * 3000, t => { const h = stem ? t * 2.4 * (i / 10) : 2.4 + Math.sin(t * 3) * .2; const rad = stem ? .15 : (.3 + rr * 1.1) * Math.min(1, t * 2);
+      sm.position.set(p.x + Math.cos(a) * rad, p.y + Math.min(h, 2.6) * Math.min(1, t * 2.5), p.z + Math.sin(a) * rad); sm.scale.setScalar(.4 + t * 1.4); sm.material.opacity = Math.sin(Math.min(1, t * 1.2) * Math.PI) * .7; }); }
+  explosion(p, 5, 0xfff0c0); shake = 1.6; vib([60, 40, 120]);
+}
+function scFallout(lat, lon, deg, km) { const p = ground(lat, lon); const L = scKm(lat, lon, km); const g = new THREE.CircleGeometry(1, 40); g.rotateX(-Math.PI / 2);
+  const m = new THREE.MeshBasicMaterial({ color: 0xc8ff4a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }); const e = add(new THREE.Mesh(g, m)); SC.objs.push(e);
+  const a = (90 - deg) * Math.PI / 180; e.rotation.y = a; e.position.set(p.x + Math.cos(a) * L / 2, p.y + .06, p.z - Math.sin(a) * L / 2);
+  const st = performance.now(); fx.push(now => { if (!SC.objs.includes(e)) return false; const t = Math.min(1, (now - st) / 4000); e.scale.set(L / 2 * t + .01, 1, L / 9 * t + .01); m.opacity = .16 * t; return true; });
+  const Lb = addLabel(`☢ Fallout plume <em>illustrative · wind-dependent</em>`, 'scL', new THREE.Vector3(p.x + Math.cos(a) * L * .8, p.y + .1, p.z - Math.sin(a) * L * .8), 5, { ay: .5 }); SC.labs.push(Lb); }
+function runScen(sc) {
+  if (!sc) return; if (SC.on) endScen(); SC.on = sc; S.nextAt = performance.now() + 1e9; S.userAt = -1e9;
+  $('#scen').classList.remove('open'); $('#scrim').classList.remove('on'); document.body.classList.add('scen'); $('#scBarT').textContent = sc.short;
+  const tg = sc.targets || [sc.target]; const T0 = tg[0]; const tp = tg.map(t => ground(t.lat, t.lon)); const o = sc.origin ? scClamp(sc.origin.lat, sc.origin.lon) : null;
+  flyTo(tp[0], sc.kind === 'nuclear' ? 7 : 9);
+  const lab = (t, p) => { const L = addLabel(`<b>SIM</b> ${esc(t.name)}`, 'scT', p.clone().setY(p.y + .3), 9, { ay: 1, force: true }); SC.labs.push(L); };
+  tg.forEach((t, i) => lab(t, tp[i]));
+  if (o && sc.origin) { const L = addLabel(`↗ ${esc(sc.origin.name)}`, 'scT dim', o.clone().setY(o.y + .25), 4, { ay: 1 }); SC.labs.push(L); }
+  const k = sc.kind; let tHit = 2200;
+  const shoot = (from, to, i, n, cb, opt = {}) => scT(() => projectile(arcPath(from, to, opt.h || .35), { color: opt.color || 0xff6a2b, dur: opt.dur || 2000, size: opt.size || .09, onHit: cb }), 600 + i * (opt.gap || 260));
+  if (k === 'nuclear') { shoot(o, tp[0], 0, 1, () => { nukeFx(tp[0], sc.yield_kt); nukeRadii(sc.yield_kt, sc.burst === 'surface').forEach((r, i) => scT(() => scRing(T0.lat, T0.lon, r[1], r[2], r[0]), 500 + i * 450));
+      if (sc.fallout) scT(() => scFallout(T0.lat, T0.lon, sc.fallout.dir_deg, 160), 3200); }, { color: 0xffffff, dur: 3000, size: .12, h: .5 }); tHit = 3600; }
+  else if (k === 'bunker') { tp.forEach((p, i) => shoot(o, p, i * 4, 1, () => { groundHit(p, 3, 0x8a6a4a, 3000); scT(() => { explosion(p, 4, 0xffb060); ringPulse(p, 0xffb060, 1.2, 1800, 3, 250); }, 450); scT(() => explosion(p, 3, 0xffb060), 900); }, { dur: 2600, color: 0xd0d8ff, h: .45 })); tHit = 4200; }
+  else if (k === 'mines') { tp.forEach((p, i) => scT(() => mineHit(p, 4, 0x4fd1ff), 400 + i * 1500)); scT(() => scRing(26.6, 56.4, 45, '#4fd1ff', 'Strait closed (illustrative zone)'), 4800); tHit = 5200; }
+  else if (k === 'blockade') { tp.forEach((p, i) => scT(() => { ships(p, new THREE.Color('#ff4b3e').getHex(), 3); ringPulse(p, 0xff4b3e, 1.5, 2200, 2); }, 400 + i * 700)); scT(() => scRing(23.7, 121.0, 230, '#ff4b3e', 'Blockade line (illustrative)'), 3200); tHit = 4200; }
+  else if (k === 'nuketest') { scT(() => { groundHit(tp[0], 5, 0xffd166, 4000); shake = 1.2; ringPulse(tp[0], 0xffd166, 3, 3200, 5, 350); vib([60, 40, 60]); }, 900); scT(() => scRing(T0.lat, T0.lon, 50, '#ffd166', 'Seismic signal felt regionally (illustrative)'), 2000); tHit = 3200; }
+  else if (k === 'shelling') { scT(() => artillery(tp[0], 5), 700); scT(() => artillery(tp[0], 4), 2200); if (o) scT(() => ringPulse(o, 0xff4b3e, 1, 1400, 3, 200), 300); tHit = 3600; }
+  else if (k === 'water') { scT(() => { ringPulse(o, 0x4fd1ff, 1.4, 2000, 3, 400); beamUp(o, 0x4fd1ff, 2400, 1.2); }, 300); scT(() => projectile(arcPath(o, tp[0], .1), { color: 0x4fd1ff, dur: 3200, size: .07 }), 900); scT(() => { ringPulse(tp[0], 0xc9a26a, 2.4, 3000, 3, 700); floatIcon(WARN, tp[0].clone().setY(tp[0].y + .2), 0xc9a26a, .45, 4000); }, 4000); tHit = 4600; }
+  else { const n = k === 'barrage' || k === 'rockets' ? 4 : k === 'irbm' ? 6 : 2;
+    tp.forEach((p, j) => { for (let i = 0; i < n; i++) { const q = p.clone().add(new THREE.Vector3((Math.random() - .5) * .25, 0, (Math.random() - .5) * .25)); q.y = hAt(q.x, q.z);
+      shoot(o || p.clone().add(new THREE.Vector3(-2, 0, -1)), q, j * n + i, n, () => { explosion(q, k === 'energy' ? 4 : 3, k === 'energy' ? 0xff7a1a : 0xff9a5a); if (k === 'energy') beamUp(q, 0xff7a1a, 3000, 1.2); }, { dur: k === 'irbm' ? 1500 : 2000, gap: k === 'irbm' ? 120 : 260, color: k === 'airstrikes' ? 0xffb35c : 0xff6a2b, h: k === 'irbm' ? .8 : .35 }); } }); tHit = 3200 + tp.length * n * 200; }
+  scT(() => showScenFx(sc), tHit + 1600);
+}
+function showScenFx(sc) {
+  $('#scenFx')?.remove(); const el = document.createElement('aside'); el.id = 'scenFx'; el.className = 'glass';
+  const tg = sc.targets || [sc.target]; const T0 = tg[0]; const tr = scenTrigger(sc);
+  let rad = ''; if (sc.kind === 'nuclear') { const R = nukeRadii(sc.yield_kt, sc.burst === 'surface');
+    rad = `<h4>Blast &amp; thermal radii <em>ESTIMATE</em></h4><p class="dim">${esc(sc.yield_note)} ${sc.burst === 'surface' ? 'Surface burst assumed (blast/thermal ranges ×0.8 vs optimum-height airburst).' : ''} Basis: cube-root scaling from Glasstone &amp; Dolan (1977), calibrated so 15 kt ≈ Hiroshima (5 psi ≈ 1.7 km). Real effects vary with terrain, weather and burst depth.</p>
+    <table class="scTab">${R.map(r => `<tr><td><i style="background:${r[2]}"></i>${r[0]}</td><td>${r[1] < 1 ? r[1].toFixed(2) : r[1].toFixed(1)} km</td><td class="dim">${r[3]}</td></tr>`).join('')}</table>
+    ${sc.fallout ? `<p class="dim">☢ ${esc(sc.fallout.note)}</p>` : ''}`; }
+  const R = sc.kind === 'nuclear' ? nukeRadii(sc.yield_kt, sc.burst === 'surface') : null;
+  const cities = (sc.cities || []).map(([n, la, lo]) => { const d = Math.min(...tg.map(t => hav(t.lat, t.lon, la, lo))); const inR = R ? R.filter(r => d <= r[1]).map(r => r[0])[0] : null; return [n, d, inR]; }).sort((a, b) => a[1] - b[1]);
+  el.innerHTML = `<div class="grab"></div><div class="scHyp">⚠ HYPOTHETICAL · SIMULATION — not a report, not a forecast</div><h3>${esc(sc.title)}</h3>
+   <p>${esc(sc.claim)}</p>${tr ? `<p><a class="scTr" href="#" data-open="${tr.id}">↳ Triggered by: ${esc(tr.title)} <small>${esc(tr.outlet)} · ${ago(tr.ts)}</small></a></p>` : ''}
+   <p class="dim">Weapon (assumed): ${esc(sc.weapon || '—')} · Target${tg.length > 1 ? 's' : ''}: ${tg.map(t => esc(t.name)).join('; ')} <em>(public, widely reported locations)</em></p>
+   ${rad}${(sc.facts || []).length ? `<h4>Public facts</h4><ul>${sc.facts.map(f => `<li>${esc(f)}</li>`).join('')}</ul>` : ''}
+   <h4>Nearby cities <em>distance from nearest target</em></h4><table class="scTab">${cities.map(c => `<tr><td>${esc(c[0])}</td><td>${Math.round(c[1])} km</td><td class="dim">${c[2] ? 'inside ' + c[2] + ' (est.)' : R ? 'outside blast radii' : ''}</td></tr>`).join('')}</table>
+   <h4>Knock-on effects <em>direction, with basis</em></h4><div class="scEff">${(sc.effects || []).map(([k, d, t]) => `<div><b class="${d}">${d === 'up' ? '▲' : d === 'down' ? '▼' : '◆'} ${esc(k)}</b><span>${esc(t)}</span></div>`).join('')}</div>
+   <h4>Escalation ladder</h4><ol class="scLad">${(sc.ladder || []).map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+   <h4>Sources &amp; published analysis</h4><ul class="scSrc">${(sc.sources || []).map(([t, u]) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join('')}</ul>
+   <div class="scBtns"><button data-a="replay">↻ Replay</button><button data-a="end">End simulation</button></div>`;
+  document.body.appendChild(el); requestAnimationFrame(() => el.classList.add('on'));
+  el.addEventListener('click', e => { const a = e.target.closest('[data-a]'); if (a) { if (a.dataset.a === 'replay') { const s = SC.on; endScen(); runScen(s); } else endScen(); return; }
+    const o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); const ev = S.events.find(x => x.id === o.dataset.open); if (ev) openStory(ev); } });
+  el.querySelector('.grab').addEventListener('click', () => el.classList.toggle('min'));
+}
+
 // ---------------------------------------------------------------- load
 function clearWorld() { for (const o of [...world.children]) if (o !== markers && o !== pinGroup && o !== liveG) world.remove(o); markers.clear(); pinGroup.clear(); pins.clear(); fx.length = 0; labels.forEach(l => l.el.remove()); labels = []; if (terrain) { terrain.geometry.dispose(); terrain = null; } }
 async function loadTheatre(tid) {
   if (!S.TH[tid]) tid = 'us-iran';
   const firstLoad = !S.tid; if (!firstLoad && !RMQ.matches) { const w = $('#wipe'); w.querySelector('b').textContent = S.TH[tid].name; w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); } else $('#boot').classList.remove('gone');
-  if (S.tid && S.tid !== tid) markVisit();
+  if (SC.on) endScen(); if (S.tid && S.tid !== tid) markVisit();
   S.tid = tid; S.th = S.TH[tid]; localStorage.setItem('fl_t', tid);
-  $('#thName').textContent = S.th.name; $('#sideA').textContent = S.th.sides[0].short; $('#sideB').textContent = S.th.sides[1].short;
+  $('#thName').textContent = S.th.name; document.body.classList.toggle('tension', S.th.kind === 'tension'); $('#thName').dataset.k = S.th.kind === 'tension' ? 'TENSIONS' : ''; $('#sideA').textContent = S.th.sides[0].short; $('#sideB').textContent = S.th.sides[1].short;
   document.documentElement.style.setProperty('--A', S.th.sides[0].color); document.documentElement.style.setProperty('--B', S.th.sides[1].color);
   clearWorld();
   const [d] = await Promise.all([getJSON('data/' + tid + '.json').catch(() => ({ events: [] })), buildTerrain(tid, S.th)]);
@@ -789,6 +928,35 @@ function related(e) {
   const tk = new Set((e.title.toLowerCase().match(/[a-z0-9]{4,}/g) || []).filter(w => !['says', 'said', 'after', 'amid', 'with', 'from', 'over', 'that', 'this', 'their', 'will'].includes(w)));
   return S.clusters.map(c => c.lead).filter(x => x.id !== e.id).map(x => { const t2 = (x.title.toLowerCase().match(/[a-z0-9]{4,}/g) || []); let sc = t2.filter(w => tk.has(w)).length;
     if (e.loc && x.loc && e.loc.name === x.loc.name && e.loc.kind !== 'country') sc += 1.5; if (x.type === e.type) sc += .5; return [sc, x]; }).filter(([sc]) => sc >= 2.5).sort((a, b) => b[0] - a[0] || b[1].ts - a[1].ts).slice(0, 5).map(x => x[1]);
+}
+// breaking intro visual: the theatre outline with the reported location, drawn per report type (strike path only when an attacker is named)
+function brkVis(e, col) {
+  if (!S.borders || !BB) return `<div class="bk-radar"><i></i><b></b></div>`;
+  const kx = Math.cos(LATC * Math.PI / 180); const W = (BB[2] - BB[0]) * kx, H = BB[3] - BB[1]; const X = lon => (lon - BB[0]) * kx, Y = lat => BB[3] - lat;
+  const lines = S.borders.map(L => { let d = ''; for (let i = 0; i + 1 < L.length; i += 2) d += (i ? 'L' : 'M') + X(L[i]).toFixed(2) + ' ' + Y(L[i + 1]).toFixed(2); return d; }).join('');
+  const inm = e.loc && e.loc.lat != null && inMap(e.loc.lat, e.loc.lon); const c = S.th.focus;
+  const x = inm ? X(e.loc.lon) : X(c[1]), y = inm ? Y(e.loc.lat) : Y(c[0]); const r = W / 40; const sd = S.th.sides; const t = e.type;
+  const atkS = e.atk || (KIN.has(t) ? e.actor : null); const sc = atkS ? sd[atkS === 'A' ? 0 : 1].color : col;
+  let o = ''; const f = n => n.toFixed(2);
+  if (['missile', 'air', 'drone'].includes(t) && atkS) {
+    const a = (S.th.assets || []).filter(q => q[0] === atkS); const src = a.find(q => inMap(q[3], q[4]) && Math.hypot(X(q[4]) - x, Y(q[3]) - y) > W * .15) || a[0];
+    if (src) { const sx = X(src[4]), sy = Y(src[3]); const mx = (sx + x) / 2, my = Math.min(sy, y) - Math.hypot(sx - x, sy - y) * .35;
+      o += `<path class="bv-arc" d="M${f(sx)} ${f(sy)}Q${f(mx)} ${f(my)} ${f(x)} ${f(y)}" stroke="${sc}" pathLength="1"/><circle class="bv-src" cx="${f(sx)}" cy="${f(sy)}" r="${f(r * .5)}" fill="${sc}"/>`; }
+  }
+  const boom = (d0) => [0, 1, 2].map(i => `<circle class="bv-boom" style="animation-delay:${d0 + i * .18}s" cx="${f(x)}" cy="${f(y)}" r="${f(r * 2.6)}" stroke="${col}"/>`).join('') + `<circle class="bv-flash" style="animation-delay:${d0}s" cx="${f(x)}" cy="${f(y)}" r="${f(r * 1.4)}" fill="#fff4d8"/>`;
+  const glyph = (g, d0 = .5) => `<text class="bv-gl" style="animation-delay:${d0}s" x="${f(x)}" y="${f(y - r * 1.6)}" font-size="${f(r * 2.6)}" text-anchor="middle">${g}</text>`;
+  const rings = (cls, n, gap, stroke) => Array.from({ length: n }, (_, i) => `<circle class="${cls}" style="animation-delay:${.4 + i * gap}s" cx="${f(x)}" cy="${f(y)}" r="${f(r * 3)}" stroke="${stroke}"/>`).join('');
+  if (['missile', 'air', 'drone'].includes(t)) o += boom(atkS ? 1.25 : .4);
+  else if (t === 'ground' || t === 'blast') o += boom(.4);
+  else if (t === 'mine' || t === 'naval') o += `<g class="bv-ship" style="--dx:${f(-r * 4)}px"><text x="${f(x)}" y="${f(y + r * .4)}" font-size="${f(r * 2.2)}" text-anchor="middle">🚢</text></g>` + (t === 'mine' || e.sev >= 3 ? boom(1.5) + rings('bv-wave', 2, .4, '#4fd1ff') : rings('bv-wave', 2, .5, '#4fd1ff'));
+  else if (t === 'statement') o += rings('bv-talk', 3, .35, col) + glyph('💬');
+  else if (t === 'threat') o += `<circle class="bv-warn" cx="${f(x)}" cy="${f(y)}" r="${f(r * 2.4)}" stroke="${col}"/>` + rings('bv-talk', 2, .6, col) + glyph('⚠️');
+  else if (t === 'legal') o += glyph('⚖️', .3) + rings('bv-talk', 1, 0, col);
+  else if (t === 'cyber') o += Array.from({ length: 9 }, (_, i) => `<rect class="bv-gli" style="animation-delay:${(.3 + i * .09).toFixed(2)}s" x="${f(x + (Math.sin(i * 7.1) * r * 3))}" y="${f(y + Math.cos(i * 3.3) * r * 2)}" width="${f(r * (1 + (i % 3)))}" height="${f(r * .5)}" fill="${i % 3 ? col : '#ff3dd6'}"/>`).join('') + glyph('🖥️');
+  else if (t === 'diplomacy') o += rings('bv-talk', 3, .5, '#ffffff') + glyph('🕊️');
+  else o += rings('bv-talk', 2, .5, col);
+  const pin = `<circle class="bv-pin" cx="${f(x)}" cy="${f(y)}" r="${f(r * .55)}" fill="${col}"/>`;
+  return `<div class="bk-vis"><svg viewBox="${f(-W * .04)} ${f(-H * .04)} ${f(W * 1.08)} ${f(H * 1.08)}" preserveAspectRatio="xMidYMid meet"><path class="bv-b" d="${lines}" vector-effect="non-scaling-stroke"/>${o}${pin}</svg></div>`;
 }
 function miniMap(e) {
   if (!S.borders || !BB) return ''; const kx = Math.cos(LATC * Math.PI / 180); const W = (BB[2] - BB[0]) * kx, H = BB[3] - BB[1];
@@ -1002,7 +1170,7 @@ async function init() {
   setInterval(poll, 120000); setInterval(() => { if (document.visibilityState === 'visible') pollFast(); }, 60000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { poll(); pollFast(); } });
   $('#mkt').addEventListener('click', () => $('#mkt').classList.toggle('paused'));
-window.__fl = { S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground };
+window.__fl = { runScen, openScen, endScen, loadScen, SC,  S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground };
 }
 init().catch(err => { $('#boot span').textContent = 'Could not start: ' + err.message; console.error(err); });
 

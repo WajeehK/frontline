@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 LIVE_TOPIC = 'fl-live-8143ad24bad1fb3ffba4'
 SITE = 'https://wajeehk.github.io/frontline/'
-FEEDS = [('Al Jazeera', 'https://www.aljazeera.com/xml/rss/all.xml')]
+FEEDS = [('Al Jazeera', 'https://www.aljazeera.com/xml/rss/all.xml'), ('Al Jazeera', 'https://www.aljazeera.com/news-sitemap.xml')]
 SEC = '/workspace/.fl-secrets'
 STATE = '/workspace/.fl-live/state.json'
 INTERVAL = int(os.environ.get('FL_LIVE_INTERVAL', '120'))
@@ -55,7 +55,7 @@ class Pusher:
     def maybe_send(self, S, tid, e, title_th):
         P = self.P; now = time.time(); lon = datetime.now(LON); hm = lon.hour * 60 + lon.minute
         quiet = 30 <= hm < 450
-        if e['type'] not in P.KIN or e['sev'] < 3 or (quiet and e['sev'] < 5): return 0
+        if e['type'] not in P.KIN or e['sev'] < 3 or e.get('lowrel') or (quiet and e['sev'] < 5): return 0
         n = 0; tk = P.toks(e['title'])
         for did, d in self.devices().items():
             if tid not in d.get('th', []): continue
@@ -106,13 +106,13 @@ def main():
                 except urllib.error.HTTPError as e:
                     if e.code == 304: continue
                     log(name, 'HTTP', e.code); continue
-                items = F.parse_rss(raw); known = None
+                items = F.parse_any(raw); known = None
                 for it in items:
-                    it['outlet'] = name; nu = F.norm_url(it['url'])
+                    it['outlet'] = name; nu = F.norm_url(it['url']) + ('|' + it['title'] if it.get('live') else '')
                     if nu in S['seen'] or time.time() - it['ts'] > MAX_AGE or it['ts'] > time.time() + 600: continue
                     S['seen'][nu] = int(time.time())
                     known = known or known_urls(cache)
-                    if nu in known['urls']: continue
+                    if not it.get('live') and nu in known['urls']: continue
                     for tid, th in F.T.items():
                         r2 = F.make_event(tid, it)
                         if not r2 or not r2[1]: continue

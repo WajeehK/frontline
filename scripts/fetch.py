@@ -14,6 +14,7 @@ KEEP_DAYS = 14
 UA = 'Mozilla/5.0 (compatible; FrontlineTracker/1.0; +https://github.com/WajeehK/frontline)'
 FEEDS = [
  ("Al Jazeera","https://www.aljazeera.com/xml/rss/all.xml"),
+ ("Al Jazeera","https://www.aljazeera.com/news-sitemap.xml"),
  ("BBC News","https://feeds.bbci.co.uk/news/world/middle_east/rss.xml"),
  ("BBC News","https://feeds.bbci.co.uk/news/world/europe/rss.xml"),
  ("BBC News","https://feeds.bbci.co.uk/news/world/asia/rss.xml"),
@@ -52,6 +53,23 @@ FEEDS = [
  ("Ynet News","https://www.ynetnews.com/Integration/StoryRss3089.xml"),
  ("Mehr News (Iranian state media)","https://en.mehrnews.com/rss"),
  ("Press TV (Iranian state media)","https://www.presstv.ir/rss.xml"),
+ ("Dawn","https://www.dawn.com/feeds/home"),
+ ("Express Tribune","https://tribune.com.pk/feed/home"),
+ ("The Hindu","https://www.thehindu.com/news/national/feeder/default.rss"),
+ ("Times of India","https://timesofindia.indiatimes.com/rssfeeds/-2128936835.cms"),
+ ("Hindustan Times","https://www.hindustantimes.com/feeds/rss/india-news/rssfeed.xml"),
+ ("The Guardian","https://www.theguardian.com/world/india/rss"),
+ ("The Guardian","https://www.theguardian.com/world/pakistan/rss"),
+ ("Focus Taiwan (CNA)","https://feeds.feedburner.com/rsscna/engnews"),
+ ("Taipei Times","https://www.taipeitimes.com/xml/index.rss"),
+ ("The Guardian","https://www.theguardian.com/world/taiwan/rss"),
+ ("SCMP","https://www.scmp.com/rss/4/feed"),
+ ("Yonhap","https://en.yna.co.kr/RSS/nk.xml"),
+ ("Yonhap","https://en.yna.co.kr/RSS/news.xml"),
+ ("NK News","https://www.nknews.org/feed/"),
+ ("Korea Herald","https://www.koreaherald.com/rss/newsAll"),
+ ("The Guardian","https://www.theguardian.com/world/north-korea/rss"),
+ ("The Diplomat","https://thediplomat.com/feed/"),
  ("Kyiv Independent","https://kyivindependent.com/news-archive/rss/"),
  ("Ukrinform","https://www.ukrinform.net/rss/block-lastnews"),
  ("Ukrainska Pravda","https://www.pravda.com.ua/eng/rss/"),
@@ -77,6 +95,7 @@ TYPES = [  # (type, base severity, regex) - first match wins
  ("statement",1, r"\b(war|military|conflict|nuclear|army|forces|weapons?|pentagon|irgc|idf|defen[cs]e minister|commander)\b"),
 ]
 TRX = dict((t, rx) for t, b, rx in TYPES)
+TORD = ["mine", "missile", "drone", "air", "naval", "ground", "blast", "cyber", "deploy", "legal", "diplomacy", "sanctions", "threat", "statement"]
 DIPLO_FIRST = re.compile(r"\b(ceasefire|truce|peace talks|talks|negotiat\w+|deal)\b")
 KINETIC_STRONG = re.compile(r"\b(strikes?|struck|attack(s|ed)?|bomb\w*|missiles?|drones?|killed|shelling|raid)\b")
 UP1 = re.compile(r"\b(killed|kills|dead|deaths?|death toll|casualt\w+|wounded|injured|destroy\w*|massive|barrage|wave of|waves of|dozens|hundreds|heavy|deadly|blasts?|explosions?|fatal)\b")
@@ -90,20 +109,28 @@ ACTION = re.compile(r"\b(strikes?|struck|attack(s|ed|ing)?|bomb(s|ed|ing)?|launc
 CAPAB = re.compile(r"\b(able to|capab\w+|develop\w*|build(s|ing)?|produc\w+|unveil\w*|showcas\w+|parades?|exercises?|drills?|manufactur\w+)\b")
 HYPO = re.compile(r"\b(unlikely|rules? out|ruled out|no plans? to|could|would|may|might|ready to|ready for|seeks?|seeking|response to|threaten\w*|if necessary|vows? to|plans? to|consider\w*|warns?|prepar\w+ to|possible|options?|weighs?)\b")
 INTERCEPT = re.compile(r"\b(intercept(s|ed|ing|ion|ions)?|shot down|shoots? down|downs|downed|air defen[cs]es? (destroy|down)\w*|neutrali[sz]ed)\b", re.I)
-KINETIC = {"missile", "drone", "air", "naval", "ground"}
+KINETIC = {"missile", "drone", "air", "naval", "ground", "mine"}
 SIDE_ALIASES = {
  "us-iran": {"A": [r"\bUS\b", r"\bU\.S\.", r"\bUSA\b", r"\bunited states\b", r"\bamerican?s?\b", r"\btrump\b", r"\bpentagon\b", r"\bhegseth\b", r"\bcentcom\b", r"\bwashington\b"],
              "B": [r"\biran(ian|ians)?\b", r"\btehran\b", r"\birgc\b", r"\brevolutionary guards?\b", r"\bkhamenei\b"]},
  "israel-gaza-lebanon": {"A": [r"\bisrael(i|is)?\b", r"\bidf\b", r"\bnetanyahu\b", r"\bsettlers?\b"],
              "B": [r"\bhamas\b", r"\bhezbollah\b", r"\bislamic jihad\b", r"\bmilitants?\b", r"\bpalestinian (gunm[ae]n|militants?|fighters?)\b"]},
  "russia-ukraine": {"A": [r"\bukrain(e|ian|ians)\b", r"\bkyiv\b", r"\bzelensk\w+\b", r"\bADF\b", r"\bair force\b"], "B": [r"\bruss(ia|ian|ians)\b", r"\bmoscow\b", r"\bputin\b", r"\bkremlin\b"]},
+ "pakistan-india": {"A": [r"\bindia(n|ns)?\b", r"\bnew delhi\b", r"\bmodi\b", r"\bIAF\b"], "B": [r"\bpakistan(i|is)?\b", r"\bislamabad\b", r"\brawalpindi\b", r"\bPAF\b", r"\bISI\b"]},
+ "china-taiwan": {"A": [r"\btaiwan(ese)?\b", r"\btaipei\b", r"\bROC\b", r"\bjapan(ese)?\b", r"\bUS\b", r"\bU\.S\.", r"\bphilippines?\b"], "B": [r"\bchin(a|ese)\b", r"\bbeijing\b", r"\bPLA\b", r"\bPRC\b", r"\bxi\b"]},
+ "koreas": {"A": [r"\bsouth korea(n|ns)?\b", r"\bseoul\b", r"\bROK\b", r"\bUS\b", r"\bU\.S\.", r"\bJCS\b"], "B": [r"\bnorth korea(n|ns)?\b", r"\bpyongyang\b", r"\bDPRK\b", r"\bkim jong un\b", r"\bkim yo jong\b"]},
+ "venezuela-guyana": {"A": [r"\bguyan(a|ese)\b", r"\bUS\b", r"\bU\.S\.", r"\bamerican?s?\b", r"\btrump\b", r"\bpentagon\b", r"\bhegseth\b", r"\bsouthcom\b"], "B": [r"\bvenezuel(a|an|ans)\b", r"\bmaduro\b", r"\bcaracas\b"]},
  "yemen-red-sea": {"A": [r"\bUS\b", r"\bU\.S\.", r"\bamerican?s?\b", r"\bsaudi\w*\b", r"\bisrael(i|is)?\b", r"\bcoalition\b", r"\bUK\b"], "B": [r"\bhouthis?\b", r"\bansar allah\b", r"\byemen(i|is)?\b"]},
 }
-CASE = {r"\bUS\b", r"\bUSA\b", r"\bUK\b", r"\bADF\b"}
+CASE = {r"\bUS\b", r"\bUSA\b", r"\bUK\b", r"\bADF\b", r"\bIAF\b", r"\bPAF\b", r"\bISI\b", r"\bROC\b", r"\bPLA\b", r"\bPRC\b", r"\bROK\b", r"\bJCS\b", r"\bDPRK\b"}
 VERB = r"(?:'s|’s)?\s+(?:\S+\s+){0,3}?(strikes?|struck|attacks?|attacked|launch(?:es|ed)?|fires?|fired|bombs?|bombed|hits?|seiz(?:es|ed)|shoots?|shot down|downs|downed|targets?|targeted|kills?|killed|carr(?:y|ies|ied) out|raids?|raided|shells?|shelled|pounds?|pounded|intercepts?|intercepted|missiles?|drones?|jets|warplanes|forces|troops|navy)\b"
 WEAPON_ADJ = r"(?:'s|’s)?\s+(?:\S+\s+){0,1}?(missiles?|drones?|rockets?|shaheds?|uavs?|projectiles?|warplanes?|jets?)\b"
 OWNER = {"us-iran": {"B": ["iran"]}, "israel-gaza-lebanon": {"A": ["israel", "tel aviv", "haifa", "ashkelon", "ashdod", "sderot", "eilat", "beersheba", "dimona", "nevatim", "jerusalem"], "B": ["gaza", "gaza city", "lebanon", "beirut", "dahiyeh", "tyre", "sidon", "nabatieh", "baalbek", "bekaa", "khan younis", "rafah", "jabalia", "deir al-balah", "nuseirat", "beit lahia", "beit hanoun", "southern lebanon", "bint jbeil"]},
          "russia-ukraine": {"A": ["ukraine", "kharkiv", "odesa", "dnipro", "zaporizhzhia", "lviv", "kyiv", "sumy", "kherson", "mykolaiv", "chernihiv", "poltava", "kramatorsk", "sloviansk", "kryvyi rih", "vinnytsia", "zhytomyr", "cherkasy", "ternopil", "rivne", "lutsk", "khmelnytskyi", "ivano-frankivsk", "uzhhorod", "kropyvnytskyi", "izmail"], "B": ["russia", "moscow", "kursk", "belgorod", "bryansk", "rostov", "novorossiysk", "krasnodar", "voronezh", "engels", "saratov", "tuapse", "taganrog", "volgograd", "kaluga", "tula", "oryol", "lipetsk", "tambov", "ryazan", "smolensk", "yeysk", "sochi"]},
+         "pakistan-india": {"A": ["india", "new delhi", "srinagar", "jammu", "amritsar", "pahalgam", "mumbai", "pathankot", "poonch", "rajouri", "uri", "kupwara", "baramulla", "jammu and kashmir"], "B": ["pakistan", "islamabad", "lahore", "rawalpindi", "karachi", "muzaffarabad", "bahawalpur", "muridke", "sialkot", "kotli", "azad kashmir", "pakistan-administered kashmir", "peshawar", "quetta"]},
+         "china-taiwan": {"A": ["taiwan", "taipei", "kaohsiung", "kinmen", "matsu", "penghu", "taichung", "hualien", "keelung", "pratas"], "B": ["china", "beijing", "fujian", "fuzhou", "xiamen", "shanghai", "pingtan"]},
+         "koreas": {"A": ["south korea", "seoul", "busan", "incheon", "yeonpyeong", "paju", "camp humphreys", "osan"], "B": ["north korea", "pyongyang", "yongbyon", "punggye-ri", "sohae", "wonsan", "kaesong", "sinpo", "hamhung"]},
+         "venezuela-guyana": {"A": ["guyana", "georgetown", "essequibo", "stabroek"], "B": ["venezuela", "caracas", "maracaibo", "puerto cabello", "la orchila", "ciudad guayana", "sucre", "falcon"]},
          "yemen-red-sea": {"B": ["yemen", "sanaa", "hodeidah", "saada", "ras isa", "marib", "taiz"], "A": ["saudi arabia", "riyadh", "jizan", "eilat", "israel", "medina", "jeddah", "mecca"]}}
 IRAN_PLACES = {"natanz", "fordow", "isfahan", "bushehr", "bandar abbas", "qeshm", "kharg", "shiraz", "tabriz", "mashhad", "kermanshah", "ahvaz", "abadan", "chabahar", "arak", "parchin", "qom", "karaj", "hamadan", "khorramabad", "zahedan", "bandar lengeh", "jask", "kish island", "semnan", "yazd", "kerman", "urmia", "dezful", "south pars", "tehran"}
 OWNER["us-iran"]["B"] += sorted(IRAN_PLACES)
@@ -145,11 +172,32 @@ def parse_rss(raw):
         if d.get('title') and d.get('url') and d.get('ts'): out.append(d)
     return out
 
+LIVE_PREFIX = re.compile(r"^[^:]{2,60}\b(live|updates|latest|live updates):\s*", re.I)
+def parse_sitemap(raw):
+    """Google News sitemap (published for crawlers and allowed by robots.txt): headline, URL and date only. Live-blog
+    entries carry the blog's current top headline; we keep that headline only and never fetch the blog page."""
+    import html as H
+    out = []
+    for u in re.findall(rb"<url>(.*?)</url>", raw, re.S):
+        u = u.decode('utf-8', 'replace')
+        loc = re.search(r"<loc>(.*?)</loc>", u); t = re.search(r"<news:title>(.*?)</news:title>", u, re.S); d = re.search(r"<news:publication_date>(.*?)</news:publication_date>", u)
+        if not (loc and t and d): continue
+        title = clean(H.unescape(re.sub(r"<!\[CDATA\[|\]\]>", "", t.group(1))))
+        try: ts = datetime.fromisoformat(d.group(1).strip().replace('Z', '+00:00')).timestamp()
+        except Exception: continue
+        url = loc.group(1).strip(); live = '/liveblog/' in url
+        if live:
+            title = LIVE_PREFIX.sub('', title).strip(); ts = max(ts, time.time() - 60)  # a live-blog headline is "new" when we first see it
+        if '/video/' in url or len(title) < 15: continue
+        out.append({"title": title, "url": url, "ts": ts, "desc": "", "live": live})
+    return out
+def parse_any(raw): return parse_sitemap(raw) if b"<urlset" in raw[:2000] else parse_rss(raw)
+
 def norm_url(u):
     p = urllib.parse.urlsplit(u.strip())
     return urllib.parse.urlunsplit((p.scheme, p.netloc.lower(), p.path.rstrip('/'), '', ''))
 
-def classify(title, desc):
+def classify_base(title, desc):
     tl = title.lower(); dl = (desc or '').lower()
     typ = sev = None
     if OPINION.search(title.strip()):
@@ -172,6 +220,33 @@ def classify(title, desc):
         if typ in KINETIC and UP2.search(tl): sev += 1
         if DOWN.search(tl): sev -= 1
     return typ, max(1, min(5, sev))
+
+# ---- v9 accuracy gate: kinetic types need a completed action + an explicit actor; plots, arrests, claims and commentary never animate as strikes
+LEGAL = re.compile(r"\b(plot(s|ted|ting)?|accus(e|es|ed|ing)|charg(e|es|ed|ing)|arrest\w*|indict\w*|convict\w*|sentenc\w*|trial|court|prosecut\w*|detain\w*|extradit\w*|espionage|spying|lawsuit)\b", re.I)
+SPEECH_VETO = re.compile(r"\b(feared|until|deadline|to (strike|attack|bomb|hit|invade|nuke)|could|would|may|might|calls? (for|on)|asking for|urg(e|es|ed|ing)|wants?|demands?|predicts?|expects?|warns?|threatens?|vows?|plans?|considering|weighs?|mulls?|prepar\w+|options?|scenario|if)\b", re.I)
+COMPLETED = re.compile(r"\b(strike|attack|kill|bomb|shell|batter\w*|pummel\w*|hammer(s|ed)?|torch\w*|set fire|burn(ed|s|t)|clash(es|ed)?|fighting|battles?|struck|strikes|hit|hits|hitting|bombed|bombs|bombing|launched|launches|fired|fires|killed|kills|killing|intercepted|intercepts|shot down|shoots down|downed|downs|destroyed|destroys|attacked|attacks|sank|sinks|sunk|seized|seizes|exploded|explosions?|blasts?|caught fire|catch(es)? fire|ablaze|pounded|pounds|shelled|shells|raided|raids|targeted|targets|captured|captures|wounded|injured|dead)\b", re.I)
+MINE = re.compile(r"\b(sea |naval |)mines?\b.*\b(hit|hits|hitting|struck|strikes|explod\w*|blast|caught fire|catch(es)? fire|damag\w*|sank|sunk)\b|\b(hit|hits|hitting|struck|strikes)\b.{0,30}\bmines?\b", re.I)
+SEA_INCIDENT = re.compile(r"\b(tankers?|vessels?|ships?|cargo ship|bulk carrier|warships?|frigates?|destroyers?|boats?)\b.{0,60}\b(caught fire|catch(es)? fire|ablaze|explosion|blast|hit|hits|struck|damaged|attacked|seized|sank|sunk|boarded)\b", re.I)
+BLAST = re.compile(r"\b(explosions?|blasts?|loud bangs?|sirens?)\b", re.I)
+LOWREL = {"zerohedge.com", "zerohedge", "infowars.com", "thegatewaypundit.com", "naturalnews.com", "globalresearch.ca", "activistpost.com", "beforeitsnews.com", "veteranstoday.com", "southfront.org", "tass.com", "sputnikglobe.com", "rt.com", "presstv.ir", "mehrnews.com"}
+COMMENTARY = re.compile(r"\b(says|said|claims?|opinion|op-?ed|column|commentary|analysis|podcast|interview|according to)\b", re.I)
+DEPLOYISH = re.compile(r"\b(sends?|sent|dispatch\w*|detect\w*|track(s|ed)|spott\w*|sorties?|incursions?|median line|patrol\w*|drills?|exercises?|encircl\w*|blockade drills?|deploy\w*|transit\w*|sail(s|ed)|flew|fly|flies|buzz\w*)\b", re.I)
+LOWREL_KEYS = ('zerohedge', 'infowars', 'gatewaypundit', 'naturalnews', 'globalresearch', 'activistpost', 'beforeitsnews', 'veteranstoday', 'southfront', 'thefreethoughtproject', 'sott.net')
+def low_rel(outlet): o = (outlet or '').lower(); return any(k in o for k in LOWREL_KEYS)
+def classify(title, desc, outlet=None):
+    typ, sev = classify_base(title, desc)
+    if not typ: return typ, sev
+    tl = title
+    if typ in ("statement", "threat") and DEPLOYISH.search(tl) and not SPEECH_VETO.search(tl) and not OPINION.search(tl) and any(re.search(TRX[k], tl, re.I) for k in ("air", "naval", "missile", "drone")): return "deploy", 2
+    if LEGAL.search(tl) and not re.search(r"\b(killed|struck|bombed|launched|intercepted|shot down)\b", tl, re.I): return "legal", 1
+    if typ in KINETIC or typ == "naval":
+        if "?" in tl or tl.lstrip()[:1] in "'\"‘“": return "statement", 1  # questions and quotes are commentary
+        if MINE.search(tl): return "mine", max(3, sev)
+        if SEA_INCIDENT.search(tl) and not SPEECH_VETO.search(tl): return "naval", max(2, sev)
+        if not SPEECH_VETO.search(tl) and DEPLOYISH.search(tl) and not COMPLETED.search(tl): return "deploy", 2
+        if SPEECH_VETO.search(tl) or not COMPLETED.search(tl): return ("threat", 1) if re.search(TRX["threat"] + r"|\b(strike|attack|war)\b", tl, re.I) else ("statement", 1)
+    if low_rel(outlet) and typ in KINETIC | {"mine", "naval"}: return ("threat", 1) if SPEECH_VETO.search(tl) else ("statement", 1)
+    return typ, sev
 
 UNKNOWN_REGION = re.compile(r"\b([A-Z][a-z]+(?:-[A-Z][a-z]+)?) (Oblast|region|province|governorate|district)\b")
 def geocode(tid, title, desc, kinetic=True):
@@ -244,7 +319,9 @@ def owner(tid, loc):
 
 def relevant(tid, text):
     tl = text.lower()
-    return any(re.search(r"(?<!\w)" + re.escape(k) + r"(?!\w)", tl) for k in T[tid]["keywords"]["must"])
+    has = lambda ks: any(re.search(r"(?<!\w)" + re.escape(k) + r"(?!\w)", tl) for k in ks)
+    kw = T[tid]["keywords"]
+    return has(kw.get("must", [])) or (bool(kw.get("pair")) and all(has(g) for g in kw["pair"]))
 
 def sev_w(s): return [0, 1, 2, 4, 8, 16][s]
 def toks(s):
@@ -289,7 +366,7 @@ def cluster(evs):
         pool = kin or ms
         cnt = {}
         for m in pool: cnt[m['type']] = cnt.get(m['type'], 0) + 1
-        c['type'] = max(cnt, key=lambda t: (cnt[t], -[x[0] for x in TYPES].index(t)))
+        c['type'] = max(cnt, key=lambda t: (cnt[t], -TORD.index(t)))
         same = [m for m in pool if m['type'] == c['type']]
         sv = sorted(m['sev'] for m in same); c['sev'] = sv[len(sv) // 2] if len(sv) > 2 else sv[-1]
         locs = [m['loc'] for m in ms if m['loc']]
@@ -312,7 +389,7 @@ def cluster(evs):
             if not any(o['outlet'] == m['outlet'] for o in outlets): outlets.append({"outlet": m['outlet'], "url": m['url'], "title": m['title'], "ts": m['ts'], "via": m.get('via', 'RSS'), "desc": (m.get('desc') or '')[:200]})
         out.append({"cid": cid, "ts": c['ts'], "last": ms[-1]['ts'], "type": c['type'], "sev": c['sev'], "actor": c['actor'], "atk": c['atk'], "icp": c['icp'], "men": c['men'],
                     "loc": c['loc'], "title": lead['title'], "url": lead['url'], "outlet": lead['outlet'], "n": len(ms), "outlets": outlets,
-                    "desc": next((d for d in (summ(m) for m in [lead] + ms) if d), '')})
+                    "desc": next((d for d in (summ(m) for m in [lead] + ms) if d), ''), "lowrel": 1 if all(m.get('lowrel') for m in ms) else 0})
     return sorted(out, key=lambda c: -c['ts'])
 
 def naval_reports(items, old):
@@ -350,10 +427,13 @@ def make_event(tid, it):
     if NATURAL.search(title) and not KINETIC_STRONG.search(title): return None
     if not relevant(tid, title): return None
     nu = norm_url(it['url']); eid = hashlib.sha1(nu.encode()).hexdigest()[:12]
-    typ, sev = classify(title, it.get('desc', ''))
+    if '/liveblog/' in nu: eid = hashlib.sha1((nu + '|' + title).encode()).hexdigest()[:12]  # each live-blog headline is its own report
+    typ, sev = classify(title, it.get('desc', ''), it.get('outlet'))
     if not typ: return eid, None
     loc = geocode(tid, title, it.get('desc', ''), typ in KINETIC)
     act = actor(tid, title); lnc = launcher(tid, title)
+    if typ in ("missile", "drone", "air", "ground") and not (act or lnc or (INTERCEPT.search(title) and interceptor(tid, title))):
+        typ, sev = ("blast", max(1, sev - 1)) if COMPLETED.search(title) and not NATURAL.search(title) else ("statement", 1)  # completed action but nobody named: shown as an unattributed incident, not a side's strike
     tgt = owner(tid, loc)
     icp = None; atk = None
     if INTERCEPT.search(title) and typ in KINETIC:
@@ -367,7 +447,7 @@ def make_event(tid, it):
     if not act: act = atk if typ in KINETIC else None
     men = sorted(side for side, pats in SIDE_ALIASES[tid].items() if any(re.search(*_alias_rx(p0)[:1], title, _alias_rx(p0)[1]) for p0 in pats))
     return eid, {"id": eid, "ts": int(it['ts']), "title": title[:220], "desc": (it.get('desc') or '')[:220], "url": it['url'],
-               "outlet": it['outlet'], "via": it.get('via', 'RSS'), "type": typ, "sev": sev, "actor": act, "atk": atk, "icp": icp, "men": men, "loc": loc}
+               "outlet": it['outlet'], "via": it.get('via', 'RSS'), "lowrel": 1 if low_rel(it['outlet']) else 0, "type": typ, "sev": sev, "actor": act, "atk": atk, "icp": icp, "men": men, "loc": loc}
 
 # ---- coverage sentiment (fixed lexicon, no AI): escalatory vs de-escalatory wording in recent headlines
 ESC_W = re.compile(r"\b(strikes?|struck|airstrikes?|attack(s|ed|ing)?|retaliat\w*|escalat\w*|missiles?|drones?|bomb\w*|kill(s|ed|ing)?|dead|deaths?|invad\w*|invasion|offensive|threat(s|en\w*)?|warn(s|ed|ing)?|war|wars|mobili[sz]\w*|shell(s|ed|ing)|assault\w*|raids?|clash(es|ed)?|revenge|ultimatum|seiz\w*|explosions?|blasts?|launch(es|ed)?|fire[sd]?|intercept\w*|casualt\w*|wounded|injur\w*|sanction\w*|hostil\w*|bombard\w*|siege)\b", re.I)
@@ -393,7 +473,7 @@ def main():
     items, status = [], []
     for name, url in FEEDS:
         try:
-            got = parse_rss(get(url))
+            got = parse_any(get(url))
             for g in got: g['outlet'] = name
             items += got; status.append({"src": name, "url": url, "ok": True, "n": len(got)})
         except Exception as e:
@@ -437,7 +517,7 @@ def main():
         cls = cluster(evs)
         def win(h): return [c for c in cls if c['ts'] >= NOW - h * 3600]
         def score(es):
-            return sum(sev_w(e['sev']) * (1 if e['type'] in KINETIC else 0.5 if e['type'] in ('deploy', 'threat', 'cyber', 'sanctions') else 0) for e in es)
+            return sum(sev_w(e['sev']) * (1 if e['type'] in KINETIC else 0.5 if e['type'] in ('deploy', 'threat', 'cyber', 'sanctions', 'blast') else 0) for e in es)
         d1, d7 = win(24), win(168)
         s24, s7 = score(d1), score(d7) / 7
         json.dump({"id": tid, "events": evs, "clusters": cls}, open(path, 'w'), separators=(',', ':'), ensure_ascii=False)
@@ -454,7 +534,7 @@ def main():
             if gt: g = max(-1, min(1, -(gt['tone'] + 3) / 3)); return round(.75 * l + .25 * g, 3)
             return l
         sent = {"score": comb(lx), "prev": comb(lxp), "lex": lx, "n": nsc, "n_all": nall, "n_prev": nscp, "gdelt": gt}
-        index['theatres'].append({"id": tid, "sent": sent, "name": th['name'], "n24": len(d1), "n7": len(d7), "k24": sum(1 for e in d1 if e['type'] in KINETIC),
+        index['theatres'].append({"id": tid, "kind": th.get('kind', 'conflict'), "sent": sent, "name": th['name'], "n24": len(d1), "n7": len(d7), "k24": sum(1 for e in d1 if e['type'] in KINETIC),
                                   "esc24": round(100 * (1 - math.exp(-s24 / 30))), "esc7": round(100 * (1 - math.exp(-s7 / 30))), "total": len(cls)})
     npath = os.path.join(ROOT, 'data/naval.json')
     try: oldn = json.load(open(npath)).get('reports', [])
