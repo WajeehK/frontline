@@ -66,7 +66,9 @@ const ground = (lat, lon, lift = 0) => { const p = proj(lat, lon); p.y = hAt(p.x
 const inMap = (lat, lon) => lon >= BB[0] && lon <= BB[2] && lat >= BB[1] && lat <= BB[3];
 const TERR_V = `attribute float elev; varying float vE; varying vec3 vN; varying vec2 vUv; varying vec3 vW; varying float vFog;
 void main(){ vE=elev; vN=normalize(normalMatrix*normal); vUv=uv; vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; vec4 mv=viewMatrix*w; vFog=-mv.z; gl_Position=projectionMatrix*mv; }`;
-const TERR_F = `uniform float uTime; uniform float uFog; uniform vec3 uLight; uniform vec4 uHit[6]; uniform vec3 uHitC[6]; uniform vec4 uRad; varying float vE; varying vec3 vN; varying vec2 vUv; varying vec3 vW; varying float vFog;
+const TERR_F = `uniform float uTime; uniform float uFog; uniform float uStyle; uniform sampler2D uSat; uniform float uSatOn; uniform vec3 uFogC; uniform vec3 uLight; uniform vec4 uHit[6]; uniform vec3 uHitC[6]; uniform vec4 uRad; varying float vE; varying vec3 vN; varying vec2 vUv; varying vec3 vW; varying float vFog;
+float hs(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+vec3 ironbow(float t){ t=clamp(t,0.,1.); return clamp(vec3(1.5*t-.05, 2.*t*t-.25, sin(t*3.1416*1.3)*.85+ (t>.8?(t-.8)*4.:0.)),0.,1.); }
 void main(){
  float land=smoothstep(-2.,2.,vE);
  float h=clamp(vE/3200.,0.,1.);
@@ -82,6 +84,29 @@ void main(){
  sc+=vec3(.05,.12,.2)*grid*.35;
  float sh=sin(vW.x*3.+uTime*.6)*sin(vW.z*2.3-uTime*.4); sc+=vec3(.02,.05,.08)*smoothstep(.85,1.,sh)*(1.-d);
  vec3 col=mix(sc,lc,land);
+ float sl=max(dot(normalize(vN),normalize(uLight)),0.); float d2=clamp(-vE/3000.,0.,1.); float hh=clamp(vE/3200.,0.,1.);
+ float cv=vE/100.; float cl1=1.-smoothstep(0.,fwidth(cv)*1.3,abs(fract(cv+.5)-.5)); float cv5=vE/500.; float cl5=1.-smoothstep(0.,fwidth(cv5)*1.6,abs(fract(cv5+.5)-.5));
+ vec2 g2=vW.xz/0.5; vec2 gl2=abs(fract(g2-.5)-.5)/fwidth(g2); float grid2=1.-min(min(gl2.x,gl2.y),1.);
+ float cst=1.-smoothstep(0.,1.6,abs(vE)/max(fwidth(vE),1.));
+ if(uStyle>.5&&uStyle<1.5){ // TERRAIN (map-style hypsometric tint, light)
+  vec3 l=mix(vec3(.66,.78,.55),vec3(.84,.80,.64),smoothstep(.0,.3,hh)); l=mix(l,vec3(.72,.62,.50),smoothstep(.3,.6,hh)); l=mix(l,vec3(.96,.96,.96),smoothstep(.6,.95,hh));
+  l*=.55+.62*sl; l=mix(l,l*.82,cl1*step(40.,vE)*.5); vec3 w=mix(vec3(.67,.83,.96),vec3(.47,.67,.9),pow(d2,.6)); col=mix(w,l,land); col=mix(col,vec3(.35,.55,.75),cst*.6); }
+ else if(uStyle>1.5&&uStyle<3.5){ // SATELLITE / HYBRID (Sentinel-2 cloudless imagery when loaded, shaded)
+  vec3 sat=texture2D(uSat,vUv).rgb; vec3 fake=mix(mix(vec3(.55,.48,.36),vec3(.38,.42,.28),hs(floor(vW.xz*6.))*.4),vec3(.85,.85,.82),smoothstep(.7,1.,hh)); vec3 sea=mix(vec3(.05,.12,.2),vec3(.02,.05,.1),d2);
+  vec3 b=uSatOn>.5?sat:mix(sea,fake,land); col=b*(uSatOn>.5?(.6+.6*sl):(.45+.7*sl));
+  if(uStyle>2.5){ col=mix(col,vec3(1.,.85,.4),cl5*step(100.,vE)*.25); col+=vec3(.6,.85,1.)*cst*.5; } }
+ else if(uStyle>3.5&&uStyle<4.5){ // NIGHT OPS (NVG phosphor)
+  float lum=(.12+.75*sl)*(.35+.9*pow(hh,.6))*land + (1.-land)*(.04+.05*grid2);
+  lum+=hs(vW.xz*91.+floor(uTime*24.))*.06; lum*=.92+.08*sin(gl_FragCoord.y*1.7); col=vec3(.18,1.,.32)*lum*1.1+vec3(.0,.2,.05)*cst; }
+ else if(uStyle>4.5&&uStyle<5.5){ // THERMAL / IR (white-hot)
+  float heat=land*(.18+.5*sl+.25*(1.-hh))+(1.-land)*.05; heat+=hs(floor(vW.xz*14.))*.05*land; col=ironbow(heat); }
+ else if(uStyle>5.5&&uStyle<6.5){ // TACTICAL TOPO
+  vec3 base=mix(vec3(.05,.07,.06),vec3(.09,.11,.09),hh)*(.7+.5*sl); base+=vec3(1.,.72,.25)*(cl1*.16+cl5*.42)*step(30.,vE);
+  vec3 sea=vec3(.02,.06,.07)+vec3(.1,.35,.35)*grid2*.6; col=mix(sea,base,land)+vec3(.55,.62,.35)*grid2*.18*land; col+=vec3(.2,.9,.8)*cst*.6; }
+ else if(uStyle>6.5&&uStyle<7.5){ // INTEL (high-contrast)
+  float v=floor((.15+.85*sl)*(.4+.6*hh)*5.)/5.; col=mix(vec3(0.)+vec3(0.,.25,.35)*grid2*.5,vec3(v*.75),land); col+=vec3(0.,1.,1.)*cst*1.2; }
+ else if(uStyle>7.5){ // RELIEF (exaggerated, warm hillshade)
+  vec3 l=mix(vec3(.30,.36,.22),vec3(.62,.50,.34),smoothstep(0.,.45,hh)); l=mix(l,vec3(.95,.93,.9),smoothstep(.55,.9,hh)); l*=.25+1.05*pow(sl,1.4); vec3 w=mix(vec3(.1,.25,.38),vec3(.03,.08,.16),d2); col=mix(w,l,land); }
  // impacts: hot core light, expanding shockwave ring, lingering embers (x,z,age 0..1,intensity)
  for(int i=0;i<6;i++){ vec4 H=uHit[i]; if(H.w<=0.) continue; float r=length(vW.xz-H.xy); float a=H.z;
   float core=exp(-r*r/(.02+.05*a))*(1.-a)*1.6; float wave=exp(-pow((r-a*1.4)*14.,2.))*(1.-a)*.9; float emb=exp(-r*r/.012)*.35*(1.-a*a);
@@ -91,15 +116,36 @@ void main(){
   float fall=smoothstep(uRad.z,uRad.z*.2,r); float sweep=exp(-da*2.2)*fall; float rings=(1.-smoothstep(0.,fwidth(r/1.6)*1.5,abs(fract(r/1.6)-.5)-.47))*fall*.35;
   col+=vec3(.25,.75,.45)*(sweep*.08+rings*.045)*uRad.w; }
  float coast=1.-smoothstep(0.,1.6,abs(vE)/max(fwidth(vE),1.));
- col+=vec3(.35,.6,.8)*coast*.55;
+ if(uStyle<.5) col+=vec3(.35,.6,.8)*coast*.55;
  float e=min(min(vUv.x,1.-vUv.x),min(vUv.y,1.-vUv.y)); col*=smoothstep(0.,.07,e);
- col*=exp(-pow(vFog*uFog,2.));
+ col=mix(uFogC,col,exp(-pow(vFog*uFog,2.)));
  gl_FragColor=vec4(col,1.);
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
 }`;
-const terrMat = new THREE.ShaderMaterial({ vertexShader: TERR_V, fragmentShader: TERR_F, uniforms: { uTime: { value: 0 }, uFog: { value: 0.028 }, uLight: { value: new THREE.Vector3(-0.5, 0.8, 0.35) }, uHit: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) }, uHitC: { value: Array.from({ length: 6 }, () => new THREE.Color()) }, uRad: { value: new THREE.Vector4(0, 0, 9, 1) } } });
+const terrMat = new THREE.ShaderMaterial({ vertexShader: TERR_V, fragmentShader: TERR_F, uniforms: { uTime: { value: 0 }, uFog: { value: 0.028 }, uLight: { value: new THREE.Vector3(-0.5, 0.8, 0.35) }, uHit: { value: Array.from({ length: 6 }, () => new THREE.Vector4()) }, uHitC: { value: Array.from({ length: 6 }, () => new THREE.Color()) }, uRad: { value: new THREE.Vector4(0, 0, 9, 1) }, uStyle: { value: 0 }, uSat: { value: new THREE.Texture() }, uSatOn: { value: 0 }, uFogC: { value: new THREE.Color(0) } } });
 let hitI = 0;
+// ---- v10 map styles: switchable ground looks (map-style, imagery, and battlefield variants)
+const STYLES = [['dark', 'Dark relief', '#15171b', 0], ['terrain', 'Terrain', '#b9c99a', 1], ['satellite', 'Satellite', '#6b6046', 2], ['hybrid', 'Hybrid', '#6f6a50', 3], ['nvg', 'Night ops', '#1f6a2a', 4], ['thermal', 'Thermal IR', '#d8602a', 5], ['topo', 'Tactical topo', '#3a3018', 6], ['intel', 'Intel', '#0a1f24', 7], ['relief', 'Relief', '#8a7350', 8]];
+const STY_BG = { terrain: 0xc9d6dc, satellite: 0x05070a, hybrid: 0x05070a, nvg: 0x010802, thermal: 0x05010a, topo: 0x040605, intel: 0x000000, relief: 0x0b0d10, dark: 0x000000 };
+let STY = localStorage.getItem('fl_style') || 'dark'; const SATC = {};
+async function loadSat(tid, th) { // Sentinel-2 cloudless 2016 by EOX (CC BY 4.0), no key; resampled to the theatre's lat/lon grid
+  if (SATC[tid]) return SATC[tid]; const [w, s, e, n] = th.bbox; let z = 3; while (z < 8 && (e - w) / (360 / 2 ** (z + 1)) <= 6) z++;
+  const tx = lon => (lon + 180) / 360 * 2 ** z, ty = lat => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z; };
+  const x0 = Math.floor(tx(w)), x1 = Math.floor(tx(e)), y0 = Math.floor(ty(n)), y1 = Math.floor(ty(s)); const M = document.createElement('canvas'); M.width = (x1 - x0 + 1) * 256; M.height = (y1 - y0 + 1) * 256; const mg = M.getContext('2d');
+  const jobs = []; for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) jobs.push(new Promise(res => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => { mg.drawImage(im, (x - x0) * 256, (y - y0) * 256); res(1); }; im.onerror = () => res(0); im.src = `https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/${z}/${y}/${x}.jpg`; }));
+  const ok = (await Promise.all(jobs)).filter(Boolean).length; if (!ok) return null;
+  const W = 1024, H = Math.round(W * (n - s) / ((e - w) * Math.cos((s + n) / 2 * Math.PI / 180))); const C = document.createElement('canvas'); C.width = W; C.height = H; const cg = C.getContext('2d');
+  const sx = (tx(w) - x0) * 256, sw = (tx(e) - tx(w)) * 256; for (let j = 0; j < H; j++) { const lat = n - (n - s) * (j + .5) / H; cg.drawImage(M, sx, (ty(lat) - y0) * 256, sw, 1, 0, j, W, 1); }
+  const t = new THREE.CanvasTexture(C); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; SATC[tid] = t; return t; }
+async function applyStyle(id) {
+  STY = STYLES.find(x => x[0] === id) ? id : 'dark'; localStorage.setItem('fl_style', STY); const st = STYLES.find(x => x[0] === STY);
+  const U = terrMat.uniforms; U.uStyle.value = st[3]; const bg = STY_BG[STY]; renderer.setClearColor(bg, 1); scene.fog.color.setHex(bg); U.uFogC.value.setHex(bg);
+  U.uFog.value = STY === 'terrain' ? .02 : .028; document.body.dataset.sty = STY;
+  if (S.bordersL) S.bordersL.material.color.setHex(STY === 'terrain' ? 0x3a3a3a : STY === 'intel' ? 0xff4040 : STY === 'nvg' ? 0x9dff9d : STY === 'hybrid' ? 0xffe680 : 0xffffff), S.bordersL.material.opacity = STY === 'hybrid' || STY === 'intel' ? .8 : .32;
+  $('#attrib').innerHTML = STY === 'satellite' || STY === 'hybrid' ? 'Imagery: <a href="https://s2maps.eu" target="_blank" rel="noopener">Sentinel-2 cloudless 2016</a> by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0' : 'Terrain: AWS Terrain Tiles · Borders: Natural Earth';
+  U.uSatOn.value = 0; if ((STY === 'satellite' || STY === 'hybrid') && S.tid) { const tid = S.tid; const t = await loadSat(tid, S.th).catch(() => null); if (t && S.tid === tid && (STY === 'satellite' || STY === 'hybrid')) { U.uSat.value = t; U.uSatOn.value = 1; } }
+  if (typeof renderOpts === 'function' && $('#opts').classList.contains('open')) renderOpts(); }
 function groundHit(p, sev, color = 0xff7a2a, dur = 2600) { const i = hitI++ % 6; const H = terrMat.uniforms.uHit.value[i]; terrMat.uniforms.uHitC.value[i].set(color); const st = performance.now(); const w = .5 + sev * .18;
   H.set(p.x, p.z, 0, w); fx.push(now => { const t = (now - st) / dur; if (t >= 1) { if (H.x === p.x) H.w = 0; return false; } if (H.x === p.x) H.z = t; return true; }); }
 
@@ -129,8 +175,8 @@ async function buildTerrain(tid, th) {
   for (const L of gj.borders) for (let i = 0; i + 3 < L.length; i += 2) {
     const a = ground(L[i + 1], L[i], .012), b = ground(L[i + 3], L[i + 2], .012); pts.push(a, b);
   }
-  const bl = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .32, depthWrite: false }));
-  world.add(bl);
+  const bl = S.bordersL = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .32, depthWrite: false }));
+  world.add(bl); applyStyle(STY);
 }
 
 // ---------------------------------------------------------------- labels (HTML, projected)
@@ -678,7 +724,8 @@ function sw(id, on, dis) { return `<button class="sw ${on ? 'on' : ''}" data-sw=
 function renderOpts() {
   const el = $('#optsBody'); if (!el || !S.TH) return; const perm = 'Notification' in window ? Notification.permission : 'unsupported';
   const note = !pushOK() ? 'Push isn’t supported in this browser.' : perm === 'denied' ? 'Notifications are blocked for this site. Allow them in Chrome’s site settings.' : P.on ? `On. You’ll get major strikes, missile launches and escalation jumps for the conflicts ticked below, even when the app is closed. Max 4 an hour; quiet 00:30–07:30 UK unless severity 5. Delivered within ~15 min of a report.${P.synced ? ' Synced ' + hm(P.synced / 1000) + '.' : ''}` : 'Get notified about major events even when the app is closed.';
-  el.innerHTML = `<h3>ALERTS</h3><div class="orow"><span><b>Push alerts</b><small>${note}</small></span>${sw('push', P.on, !pushOK() || perm === 'denied')}</div>
+  el.innerHTML = `<h3>MAP STYLE</h3><div class="stygrid">${STYLES.map(([id, nm, c]) => `<button class="sty${id === STY ? ' on' : ''}" data-sw="sty:${id}"><i class="sw-${id}" style="background:${c}"></i><span>${nm}</span></button>`).join('')}</div>
+   <h3>ALERTS</h3><div class="orow"><span><b>Push alerts</b><small>${note}</small></span>${sw('push', P.on, !pushOK() || perm === 'denied')}</div>
    ${Object.entries(S.TH).map(([id, t]) => `<div class="orow sub ${P.on ? '' : 'dim'}"><span>${esc(t.name)}</span>${sw('th:' + id, P.th.includes(id), !P.on)}</div>`).join('')}
    <div class="orow sub ${P.on ? '' : 'dim'}"><span>Escalation jumps (meter reaches High or Severe)</span>${sw('esc', P.esc, !P.on)}</div>
    ${P.on ? '<button class="obtn" id="pushTest">Send me a test alert</button>' : ''}
@@ -696,6 +743,7 @@ $('#opts').addEventListener('click', async e => {
   if (k === 'push') { P.on ? await pushOff() : await pushOn(); return; }
   if (k.startsWith('th:')) { const id = k.slice(3); P.th = P.th.includes(id) ? P.th.filter(x => x !== id) : [...P.th, id]; saveP(); renderOpts(); pushSync(true).catch(() => { }); return; }
   if (k === 'esc') { P.esc = !P.esc; saveP(); renderOpts(); pushSync(true).catch(() => { }); return; }
+  if (k.startsWith('sty:')) { applyStyle(k.slice(4)); renderOpts(); return; }
   if (k.startsWith('lay:')) { const id = k.slice(4); LAY[id] = !LAY[id]; applyLayers(); renderOpts(); }
 });
 function openOpts() { $('#opts').classList.add('open'); $('#scrim').classList.add('on'); renderOpts(); }
@@ -750,7 +798,7 @@ function scClamp(lat, lon) { return ground(Math.min(BB[3] - .3, Math.max(BB[1] +
 function endScen() {
   SC.timers.forEach(clearTimeout); SC.timers = []; SC.objs.forEach(o => { world.remove(o); o.material?.dispose?.(); }); SC.objs = [];
   SC.labs.forEach(L => { L.dead = true; L.el.remove(); }); labels = labels.filter(l => !SC.labs.includes(l)); SC.labs = [];
-  SC.on = null; document.body.classList.remove('scen'); $('#scenFx')?.remove(); S.nextAt = performance.now() + 2500; homeCam();
+  SC.on = null; camGoal.polar = null; camGoal.az = null; document.body.classList.remove('scen'); $('#scenFx')?.remove(); S.nextAt = performance.now() + 2500; homeCam();
 }
 $('#scBarX').addEventListener('click', endScen);
 const scT = (f, ms) => SC.timers.push(setTimeout(f, ms));
@@ -764,44 +812,191 @@ function scRing(lat, lon, km, color, label, mag = 1) {
     r.scale.setScalar(Math.max(.001, k)); fill.scale.setScalar(Math.max(.001, k)); m.opacity = .85; fm.opacity = .1 + .04 * Math.sin(now / 400); return true; });
   if (label) { const L = addLabel(`<i style="color:${color}">◯</i> ${esc(label)} · ${km < 1 ? km.toFixed(2) : km.toFixed(1)} km <em>est.${mag > 1 ? ' · drawn ×' + Math.round(mag) : ''}</em>`, 'scL', p.clone().add(new THREE.Vector3(R * .72, .05, R * .72)), 6, { ay: .5 }); SC.labs.push(L); }
 }
-function nukeFx(p, Y) {
-  const fl = $('#scFlash'); if (fl) { fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); }
-  const ball = add(sprite(GLOW, new THREE.Color(0xfff2c0), .2)); ball.position.copy(p); SC.objs.push(ball);
-  fade(ball, ball.material, 5200, t => { ball.scale.setScalar(.2 + 2.6 * Math.sqrt(t)); ball.material.color.setRGB(1, 1 - t * .5, .75 - t * .7); ball.material.opacity = (1 - t) ** .6; ball.position.y = p.y + t * 1.6; });
-  for (let i = 0; i < (Q.low ? 14 : 30); i++) { const stem = i < 10; const sm = add(sprite(SMOKE, new THREE.Color(stem ? 0x8a7a6a : 0xb09080), .4, false)); const a = Math.random() * 6.28, rr = Math.random();
-    sm.position.copy(p); sm.material.opacity = 0;
-    fade(sm, sm.material, 9000 + Math.random() * 3000, t => { const h = stem ? t * 2.4 * (i / 10) : 2.4 + Math.sin(t * 3) * .2; const rad = stem ? .15 : (.3 + rr * 1.1) * Math.min(1, t * 2);
-      sm.position.set(p.x + Math.cos(a) * rad, p.y + Math.min(h, 2.6) * Math.min(1, t * 2.5), p.z + Math.sin(a) * rad); sm.scale.setScalar(.4 + t * 1.4); sm.material.opacity = Math.sin(Math.min(1, t * 1.2) * Math.PI) * .7; }); }
-  explosion(p, 5, 0xfff0c0); shake = 1.6; vib([60, 40, 120]);
-}
 function scFallout(lat, lon, deg, km) { const p = ground(lat, lon); const L = scKm(lat, lon, km); const g = new THREE.CircleGeometry(1, 40); g.rotateX(-Math.PI / 2);
   const m = new THREE.MeshBasicMaterial({ color: 0xc8ff4a, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }); const e = add(new THREE.Mesh(g, m)); SC.objs.push(e);
   const a = (90 - deg) * Math.PI / 180; e.rotation.y = a; e.position.set(p.x + Math.cos(a) * L / 2, p.y + .06, p.z - Math.sin(a) * L / 2);
   const st = performance.now(); fx.push(now => { if (!SC.objs.includes(e)) return false; const t = Math.min(1, (now - st) / 4000); e.scale.set(L / 2 * t + .01, 1, L / 9 * t + .01); m.opacity = .16 * t; return true; });
   const Lb = addLabel(`☢ Fallout plume <em>illustrative · wind-dependent</em>`, 'scL', new THREE.Vector3(p.x + Math.cos(a) * L * .8, p.y + .1, p.z - Math.sin(a) * L * .8), 5, { ay: .5 }); SC.labs.push(Lb); }
+// ---- v10 scenario engine: modelled delivery vehicles, distinct impacts and persistent aftermath (all HYPOTHETICAL)
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x2a2018, 1.4)); { const dl = new THREE.DirectionalLight(0xffffff, 2.2); dl.position.set(-4, 8, 3); scene.add(dl); }
+const SCA = o => { world.add(o); SC.objs.push(o); return o; };
+const scAlive = o => SC.objs.includes(o);
+function scLoop(o, fn) { const st = performance.now(); fx.push(now => { if (!scAlive(o)) return false; return fn((now - st) / 1000, now) !== false; }); }
+const PBR = (c, r = .55, m = .35) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
+function planform(pts, s) { const sh = new THREE.Shape(); pts.forEach(([x, y], i) => i ? sh.lineTo(x * s, y * s) : sh.moveTo(x * s, y * s)); sh.closePath(); return sh; }
+const B2_PTS = [[0, -.42], [1, .26], [.98, .33], [.64, .52], [.43, .37], [.22, .52], [0, .38], [-.22, .52], [-.43, .37], [-.64, .52], [-.98, .33], [-1, .26]];
+function flatMesh(shape, depth, mat) { const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: depth * .6, bevelSize: depth * .5, bevelSegments: 2 }); g.rotateX(-Math.PI / 2); return new THREE.Mesh(g, mat); }
+function b2Mesh(s = .46) { const g = new THREE.Group(); const body = flatMesh(planform(B2_PTS, s), s * .025, PBR(0x59636e, .55, .35)); g.add(body); const ed = new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry, 30), new THREE.LineBasicMaterial({ color: 0xc8d2dc, transparent: true, opacity: .55 })); g.add(ed);
+  const hump = new THREE.Mesh(new THREE.SphereGeometry(s * .12, 16, 8), PBR(0x4a535c, .6, .3)); hump.scale.set(1.2, .3, 1.8); hump.position.set(0, s * .03, s * .05); g.add(hump);
+  const cp = new THREE.Mesh(new THREE.SphereGeometry(s * .06, 12, 6), PBR(0x0c1820, .15, .8)); cp.scale.set(1.6, .45, 1); cp.position.set(0, s * .055, s * .26); g.add(cp);
+  for (const [x, c] of [[-s * .99, 0xff3030], [s * .99, 0x30ff60]]) { const l = sprite(GLOW, new THREE.Color(c), s * .12); l.position.set(x, 0, -s * .27); g.add(l); }
+  const sh = new THREE.Mesh(new THREE.ShapeGeometry(planform(B2_PTS, s)).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: .35, depthWrite: false })); g.userData.shadow = sh;
+  return g; }
+function jetMesh2(s = .13) { const g = new THREE.Group(); const P = [[0, -1], [.12, -.5], [.18, -.1], [.95, .45], [.95, .58], [.2, .5], [.35, .9], [.35, 1], [0, .95], [-.35, 1], [-.35, .9], [-.2, .5], [-.95, .58], [-.95, .45], [-.18, -.1], [-.12, -.5]];
+  g.add(flatMesh(planform(P, s), s * .05, PBR(0x6c7682, .5, .4))); const ab = sprite(GLOW, new THREE.Color(0xffa040), s * .7); ab.position.set(0, 0, -s * 1.02); g.add(ab); g.userData.ab = ab; return g; }
+function droneMesh(s = .07) { const g = new THREE.Group(); g.add(flatMesh(planform([[0, -1], [.9, .55], [.9, .75], [.1, .6], [0, .8], [-.1, .6], [-.9, .75], [-.9, .55]], s), s * .08, PBR(0xb8b0a0, .8, .1))); return g; }
+function bombMesh(L = .12, c = 0x4a5040) { const g = new THREE.Group(); const m = PBR(c, .5, .5);
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(L * .12, L * .12, L * .8, 10), m); b.rotation.x = Math.PI / 2; g.add(b);
+  const n = new THREE.Mesh(new THREE.ConeGeometry(L * .12, L * .25, 10), m); n.rotation.x = Math.PI / 2; n.position.z = L * .52; g.add(n);
+  for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(L * .02, L * .22, L * .14), m); f.position.z = -L * .38; f.rotation.z = i * Math.PI / 2; f.position.x = Math.cos(i * Math.PI / 2 + Math.PI / 2) * L * .1; f.position.y = Math.sin(i * Math.PI / 2 + Math.PI / 2) * L * .1; g.add(f); } return g; }
+function missileMesh(L = .16, c = 0xe8e8e0) { const g = bombMesh(L, c); const pl = sprite(GLOW, new THREE.Color(0xffb050), L * .9); pl.position.z = -L * .55; g.add(pl); g.userData.plume = pl; return g; }
+function shipMesh(kind = 'tanker', s = .2) { const g = new THREE.Group(); const hull = kind === 'tanker' ? 0x7a2e24 : 0x5d666f;
+  const H = flatMesh(planform([[0, -1], [.16, -.75], [.17, .85], [.12, 1], [-.12, 1], [-.17, .85], [-.16, -.75]], s), s * .08, PBR(hull, .7, .2)); g.add(H);
+  const dk = new THREE.Mesh(new THREE.BoxGeometry(s * .26, s * .03, s * 1.6), PBR(kind === 'tanker' ? 0x3d5a3a : 0x6f7880, .8, .1)); dk.position.set(0, s * .1, -s * .05); g.add(dk);
+  const sup = new THREE.Mesh(new THREE.BoxGeometry(s * .24, s * .2, s * .22), PBR(0xe8e8e8, .6, .1)); sup.position.set(0, s * .2, kind === 'tanker' ? -s * .75 : s * .1); g.add(sup);
+  if (kind !== 'tanker') { const gun = new THREE.Mesh(new THREE.CylinderGeometry(s * .05, s * .06, s * .06, 8), PBR(0x6f7880)); gun.position.set(0, s * .14, s * .6); g.add(gun); }
+  return g; }
+// textures for aftermath decals
+const SCORCH = tex((g, n) => { const r = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2); r.addColorStop(0, 'rgba(10,6,4,.95)'); r.addColorStop(.55, 'rgba(25,14,8,.8)'); r.addColorStop(.8, 'rgba(60,35,18,.35)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, n, n);
+  for (let i = 0; i < 260; i++) { const a = Math.random() * 6.28, d = Math.random() * n * .45; g.fillStyle = `rgba(${Math.random() < .5 ? '0,0,0' : '70,40,20'},${Math.random() * .35})`; g.beginPath(); g.arc(n / 2 + Math.cos(a) * d, n / 2 + Math.sin(a) * d, Math.random() * n * .03, 0, 7); g.fill(); } }, 256);
+const CRATER = tex((g, n) => { const r = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2); r.addColorStop(0, 'rgba(5,4,3,1)'); r.addColorStop(.5, 'rgba(30,22,15,.95)'); r.addColorStop(.62, 'rgba(150,120,90,.8)'); r.addColorStop(.75, 'rgba(60,45,30,.5)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, n, n); }, 128);
+const SLICK = tex((g, n) => { for (let i = 0; i < 40; i++) { const x = n / 2 + (Math.random() - .5) * n * .5, y = n / 2 + (Math.random() - .5) * n * .5; const r = g.createRadialGradient(x, y, 0, x, y, n * .22); r.addColorStop(0, 'rgba(8,8,10,.5)'); r.addColorStop(1, 'rgba(8,8,10,0)'); g.fillStyle = r; g.fillRect(0, 0, n, n); } }, 128);
+const DRY = tex((g, n) => { g.fillStyle = 'rgba(0,0,0,0)'; g.fillRect(0, 0, n, n); const r = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2); r.addColorStop(0, 'rgba(190,150,90,.8)'); r.addColorStop(1, 'rgba(190,150,90,0)'); g.fillStyle = r; g.fillRect(0, 0, n, n);
+  g.strokeStyle = 'rgba(70,45,20,.7)'; g.lineWidth = 1.2; for (let i = 0; i < 70; i++) { let x = n / 2 + (Math.random() - .5) * n * .7, y = n / 2 + (Math.random() - .5) * n * .7; g.beginPath(); g.moveTo(x, y); for (let k = 0; k < 4; k++) { x += (Math.random() - .5) * 22; y += (Math.random() - .5) * 22; g.lineTo(x, y); } g.stroke(); } }, 256);
+function decal(p, R, map, op = 1, grow = 1.2) { const m = new THREE.MeshBasicMaterial({ map, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }); const d = SCA(new THREE.Mesh(DISC, m)); d.position.copy(p).y += .02; d.rotation.y = Math.random() * 6;
+  scLoop(d, t => { const u = Math.min(1, t / grow); d.scale.setScalar(R * (.3 + .7 * Math.sqrt(u))); m.opacity = op * u; }); return d; }
+function smokePlume(p, { h = 1, w = .12, col = 0x2a2522, rate = 8, life = 5, glow = 0 } = {}) { const anchor = SCA(new THREE.Object3D()); let acc = 0, last = performance.now();
+  scLoop(anchor, (t, now) => { acc += (now - last) / 1000 * rate * (Q.low ? .5 : 1); last = now; while (acc > 1) { acc--; const s = add(sprite(SMOKE, new THREE.Color(col), w, false)); s.position.copy(p); s.material.opacity = 0; const dx = (Math.random() - .5) * w, dz = (Math.random() - .5) * w; const drift = .15 + Math.random() * .1;
+    fade(s, s.material, life * 1000, u => { s.position.set(p.x + dx + u * drift * h, p.y + u * h, p.z + dz + u * drift * h * .4); s.scale.setScalar(w * (1 + u * 3)); s.material.opacity = Math.sin(Math.min(1, u * 1.4) * Math.PI) * .75; });
+    if (glow && Math.random() < .5) { const f = add(sprite(GLOW, new THREE.Color(0xff7a20), w * 1.4)); f.position.copy(p).add(new THREE.Vector3(dx, .01, dz)); fade(f, f.material, 700, u => { f.material.opacity = (1 - u) * glow; f.position.y = p.y + u * .08; }); } } }); return anchor; }
+function fires(p, R, n) { for (let i = 0; i < n; i++) { const a = Math.random() * 6.28, d = Math.sqrt(Math.random()) * R; const q = p.clone().add(new THREE.Vector3(Math.cos(a) * d, 0, Math.sin(a) * d)); q.y = Math.max(hAt(q.x, q.z), 0) + .01;
+  const f = SCA(sprite(GLOW, new THREE.Color(0xff6a18), .05 + Math.random() * .05)); f.position.copy(q); const ph = Math.random() * 9; scLoop(f, t => { f.material.opacity = .55 + .45 * Math.sin(t * 13 + ph) * Math.sin(t * 7.3 + ph); });
+  if (i % 3 === 0) smokePlume(q, { h: .5, w: .05, rate: 2, life: 4, col: 0x3a332e }); } }
+function waterSpout(p, s = 1) { for (let i = 0; i < (Q.low ? 14 : 28); i++) { const sp = add(sprite(SMOKE, new THREE.Color(0xe8f4ff), .07 * s, false)); const v = new THREE.Vector3((Math.random() - .5) * .5, 1.4 + Math.random() * 1.2, (Math.random() - .5) * .5).multiplyScalar(s * .5);
+  fade(sp, sp.material, 1800, u => { sp.position.set(p.x + v.x * u, p.y + v.y * u - 1.2 * s * u * u, p.z + v.z * u); sp.scale.setScalar(.07 * s * (1 + u * 2)); sp.material.opacity = (1 - u) * .9; }); }
+  ringPulse(p, 0xcfefff, .6 * s, 1600, 2, 250); }
+function dustRing(p, R, dur = 2600, col = 0x9a8470) { const n = Q.low ? 18 : 36; for (let i = 0; i < n; i++) { const a = i / n * 6.28 + Math.random() * .2; const s = add(sprite(SMOKE, new THREE.Color(col), .12, false));
+  fade(s, s.material, dur, u => { const r = R * (1 - (1 - u) ** 2); s.position.set(p.x + Math.cos(a) * r, p.y + .04 + u * .08, p.z + Math.sin(a) * r); s.scale.setScalar(.12 + u * .35); s.material.opacity = Math.sin(Math.min(1, u * 1.2) * Math.PI) * .7; }); } }
+// flight: mesh follows f(t) (0..1) over dur ms, nose along tangent; shadow follows ground
+function fly(obj, f, dur, { delay = 0, onT = [], end, keep = false, bank = 0 } = {}) { SCA(obj); obj.visible = false; const sh = obj.userData.shadow; if (sh) SCA(sh); const st = performance.now() + delay; const fired = new Set();
+  scLoop(obj, (_, now) => { const t = (now - st) / dur; if (t < 0) return true; obj.visible = true; const u = Math.min(1, t); const p = f(u), q = f(Math.min(1, u + .01)); obj.position.copy(p); if (q.distanceToSquared(p) > 1e-10) obj.lookAt(q); if (bank) obj.rotateZ(bank * Math.sin(u * Math.PI));
+    if (sh) { sh.position.set(p.x, Math.max(hAt(p.x, p.z), 0) + .015, p.z); sh.rotation.y = obj.rotation.y; sh.material.opacity = .3 * Math.max(0, 1 - (p.y - sh.position.y) / 3); }
+    onT.forEach(([at, cb], i) => { if (u >= at && !fired.has(i)) { fired.add(i); cb(p.clone()); } });
+    if (t >= 1) { end && end(p.clone()); if (!keep) { obj.visible = false; if (sh) sh.visible = false; } return false; } return true; }); return obj; }
+const lerpV = (a, b) => u => a.clone().lerp(b, u);
+const arcF = (a, b, h) => u => { const p = a.clone().lerp(b, u); p.y += Math.sin(u * Math.PI) * h; return p; };
+function trailFX(obj, col = 0xd8d4cc, w = .05, every = 40) { let last = 0; scLoop(obj, (_, now) => { if (!obj.visible || now - last < every) return; last = now; const s = add(sprite(SMOKE, new THREE.Color(col), w, false)); s.position.copy(obj.position);
+  fade(s, s.material, 2200, u => { s.scale.setScalar(w * (1 + u * 2.5)); s.material.opacity = (1 - u) * .5; }); }); }
+function dropBomb(from, to, { L = .12, dur = 1400, onHit } = {}) { const b = bombMesh(L); const mid = from.clone().lerp(to, .3); mid.y = from.y - .1; const c = new THREE.QuadraticBezierCurve3(from, mid, to); fly(b, u => c.getPoint(u * u), dur, { end: onHit }); return b; }
+function impact(p, sev = 3, { crater = true, smoke = true, col = 0xff8a3a } = {}) { const sea = hAt(p.x, p.z) <= 0.001; if (sea) { waterSpout(p, .6 + sev * .15); return; }
+  explosion(p, sev, col); groundHit(p, sev, col, 3000); if (crater) decal(p, .05 + sev * .025, CRATER, .95, .3); if (smoke) smokePlume(p, { h: .5 + sev * .12, w: .05 + sev * .012, rate: 4, life: 4.5, col: 0x2d2824 }); }
+function caption(t) { const c = $('#scCap'); if (!c) return; c.innerHTML = `<b>SIM</b> ${t}`; c.classList.remove('go'); void c.offsetWidth; c.classList.add('go'); }
+function camTo(p, d, polar = 1.08, az = null, snap = false) { S.userAt = -1e9; camGoal.fl = null; camGoal.target = p.clone(); camGoal.dist = d; camGoal.polar = polar; camGoal.az = az;
+  if (snap || SC.first) { SC.first = false; const off = camera.position.clone().sub(controls.target); const sp = new THREE.Spherical().setFromVector3(off); sp.radius = d; sp.phi = polar; if (az != null) sp.theta = az; controls.target.copy(p); camera.position.copy(p).add(new THREE.Vector3().setFromSpherical(sp)); } }
+// ---- nuclear: mushroom cloud with rolling toroidal cap, condensation shell, ground shock, charred zone, fires
+function mushroom(p, H = 1.6, s = 1) { const root = SCA(new THREE.Object3D()); const parts = []; const N = Q.low ? 44 : 90;
+  for (let i = 0; i < N; i++) { const cap = i >= N * .35; const sp = add(sprite(SMOKE, new THREE.Color(0xd8a070), .3 * s, false)); SC.objs.push(sp); const a = Math.random() * 6.28, r = Math.random();
+    parts.push({ sp, cap, a, r, k: Math.random(), y: Math.random() }); }
+  const core = SCA(sprite(GLOW, new THREE.Color(0xffa040), .6 * s)); const skirt = [];
+  scLoop(root, t => { const rise = 1 - Math.exp(-t / 2.4); const top = p.y + H * rise; const cool = Math.min(1, t / 7);
+    for (const q of parts) { let x, y, z, sc;
+      if (q.cap) { const R = (.2 + .14 * rise) * s, rr = (.11 + .05 * rise) * s; const th = q.a + t * .25, ph = q.k * 6.28 + t * 1.6; const ring = R + Math.cos(ph) * rr * (.6 + .4 * q.r);
+        x = p.x + Math.cos(th) * ring; z = p.z + Math.sin(th) * ring; y = top + Math.sin(ph) * rr * .8; sc = (.2 + .1 * q.r) * s * (.6 + .5 * rise); }
+      else { const hh = q.y * (top - p.y); const w = (.05 + .05 * (1 - q.y) ** 3 + .015 * Math.sin(t * 2 + q.k * 9)) * s; x = p.x + Math.cos(q.a + t * .4) * w; z = p.z + Math.sin(q.a + t * .4) * w; y = p.y + hh; sc = (.13 + .05 * q.r) * s; }
+      q.sp.position.set(x + t * .015, y, z); q.sp.scale.setScalar(sc); const hot = Math.max(0, 1 - cool * 1.4) * (q.cap ? 1 : .7);
+      q.sp.material.color.setRGB(.42 + .55 * hot, .36 + .25 * hot, .32 + .02 * hot); q.sp.material.opacity = Math.min(.92, t * 1.5); }
+    core.position.set(p.x, top, p.z); core.scale.setScalar((.5 + .3 * rise) * s); core.material.opacity = Math.max(0, 1 - t / 5) * .9; });
+  return root; }
+function nukeDetonate(p, R, sc) { const fl = $('#scFlash'); if (fl) { fl.classList.remove('go'); void fl.offsetWidth; fl.classList.add('go'); }
+  const ball = add(sprite(GLOW, new THREE.Color(0xfff6d8), .3)); ball.position.copy(p); fade(ball, ball.material, 2600, t => { ball.scale.setScalar(.3 + 1.6 * Math.sqrt(t)); ball.material.opacity = (1 - t) ** .5; ball.position.y = p.y + t * .5; });
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .0, depthWrite: false })); add(shell); shell.position.copy(p);
+  fade(shell, shell.material, 1500, t => { shell.scale.setScalar(.1 + t * R.r1 * 1.1); shell.material.opacity = Math.sin(t * Math.PI) * .22; });
+  const ring = new THREE.Mesh(RING, new THREE.MeshBasicMaterial({ color: 0xfff0d0, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide })); add(ring); ring.position.copy(p).y += .03;
+  fade(ring, ring.material, 2400, t => { ring.scale.setScalar(.05 + R.r1 * t); ring.material.opacity = (1 - t) * .9; });
+  dustRing(p, R.r1, 3200); groundHit(p, 5, 0xffd080, 9000); shake = 1.8; vib([80, 40, 160]);
+  mushroom(p, 1.5 + R.r1 * .6, Math.max(.8, R.r1 * .9));
+  setTimeout(() => { if (SC.on !== sc) return; decal(p, R.r5 * 1.15, SCORCH, .95, 2.5); fires(p, R.r5, Q.low ? 10 : 22); }, 900);
+  setTimeout(() => { if (SC.on !== sc) return; decal(p, R.r1 * 1.05, SCORCH, .35, 3); }, 1600); }
 function runScen(sc) {
-  if (!sc) return; if (SC.on) endScen(); SC.on = sc; S.nextAt = performance.now() + 1e9; S.userAt = -1e9;
+  if (!sc) return; if (SC.on) endScen(); SC.on = sc; SC.first = true; S.nextAt = performance.now() + 1e9; S.userAt = -1e9;
   $('#scen').classList.remove('open'); $('#scrim').classList.remove('on'); document.body.classList.add('scen'); $('#scBarT').textContent = sc.short;
-  const tg = sc.targets || [sc.target]; const T0 = tg[0]; const tp = tg.map(t => ground(t.lat, t.lon)); const o = sc.origin ? scClamp(sc.origin.lat, sc.origin.lon) : null;
-  flyTo(tp[0], sc.kind === 'nuclear' ? 5 : 9);
+  const tg = sc.targets || [sc.target]; const T0 = tg[0]; const tp = tg.map(t => ground(t.lat, t.lon)); const o = sc.origin ? scClamp(sc.origin.lat, sc.origin.lon) : tp[0].clone().add(new THREE.Vector3(-3, 0, -2));
+  const ctr = tp.reduce((a, b) => a.add(b), new THREE.Vector3()).multiplyScalar(1 / tp.length); const dir = ctr.clone().sub(o).setY(0).normalize(); const side = new THREE.Vector3(-dir.z, 0, dir.x);
   const lab = (t, p) => { const L = addLabel(`<b>SIM</b> ${esc(t.name)}`, 'scT', p.clone().setY(p.y + .3), 9, { ay: 1, force: true }); SC.labs.push(L); };
   tg.forEach((t, i) => lab(t, tp[i]));
-  if (o && sc.origin) { const L = addLabel(`↗ ${esc(sc.origin.name)}`, 'scT dim', o.clone().setY(o.y + .25), 4, { ay: 1 }); SC.labs.push(L); }
-  const k = sc.kind; let tHit = 2200;
-  const shoot = (from, to, i, n, cb, opt = {}) => scT(() => projectile(arcPath(from, to, opt.h || .35), { color: opt.color || 0xff6a2b, dur: opt.dur || 2000, size: opt.size || .09, onHit: cb }), 600 + i * (opt.gap || 260));
-  if (k === 'nuclear') { shoot(o, tp[0], 0, 1, () => { nukeFx(tp[0], sc.yield_kt); const RR = nukeRadii(sc.yield_kt, sc.burst === 'surface'); const mag = Math.max(1, .6 / scKm(T0.lat, T0.lon, RR[4][1])); RR.forEach((r, i) => scT(() => scRing(T0.lat, T0.lon, r[1], r[2], r[0], mag), 500 + i * 450));
-      if (sc.fallout) scT(() => scFallout(T0.lat, T0.lon, sc.fallout.dir_deg, 160), 3200); }, { color: 0xffffff, dur: 3000, size: .12, h: .5 }); tHit = 3600; }
-  else if (k === 'bunker') { tp.forEach((p, i) => shoot(o, p, i * 4, 1, () => { groundHit(p, 3, 0x8a6a4a, 3000); scT(() => { explosion(p, 4, 0xffb060); ringPulse(p, 0xffb060, 1.2, 1800, 3, 250); }, 450); scT(() => explosion(p, 3, 0xffb060), 900); }, { dur: 2600, color: 0xd0d8ff, h: .45 })); tHit = 4200; }
-  else if (k === 'mines') { tp.forEach((p, i) => scT(() => mineHit(p, 4, 0x4fd1ff), 400 + i * 1500)); scT(() => scRing(26.6, 56.4, 45, '#4fd1ff', 'Strait closed (illustrative zone)'), 4800); tHit = 5200; }
-  else if (k === 'blockade') { tp.forEach((p, i) => scT(() => { ships(p, new THREE.Color('#ff4b3e').getHex(), 3); ringPulse(p, 0xff4b3e, 1.5, 2200, 2); }, 400 + i * 700)); scT(() => scRing(23.7, 121.0, 230, '#ff4b3e', 'Blockade line (illustrative)'), 3200); tHit = 4200; }
-  else if (k === 'nuketest') { scT(() => { groundHit(tp[0], 5, 0xffd166, 4000); shake = 1.2; ringPulse(tp[0], 0xffd166, 3, 3200, 5, 350); vib([60, 40, 60]); }, 900); scT(() => scRing(T0.lat, T0.lon, 50, '#ffd166', 'Seismic signal felt regionally (illustrative)'), 2000); tHit = 3200; }
-  else if (k === 'shelling') { scT(() => artillery(tp[0], 5), 700); scT(() => artillery(tp[0], 4), 2200); if (o) scT(() => ringPulse(o, 0xff4b3e, 1, 1400, 3, 200), 300); tHit = 3600; }
-  else if (k === 'water') { scT(() => { ringPulse(o, 0x4fd1ff, 1.4, 2000, 3, 400); beamUp(o, 0x4fd1ff, 2400, 1.2); }, 300); scT(() => projectile(arcPath(o, tp[0], .1), { color: 0x4fd1ff, dur: 3200, size: .07 }), 900); scT(() => { ringPulse(tp[0], 0xc9a26a, 2.4, 3000, 3, 700); floatIcon(WARN, tp[0].clone().setY(tp[0].y + .2), 0xc9a26a, .45, 4000); }, 4000); tHit = 4600; }
-  else { const n = k === 'barrage' || k === 'rockets' ? 4 : k === 'irbm' ? 6 : 2;
-    tp.forEach((p, j) => { for (let i = 0; i < n; i++) { const q = p.clone().add(new THREE.Vector3((Math.random() - .5) * .25, 0, (Math.random() - .5) * .25)); q.y = hAt(q.x, q.z);
-      shoot(o || p.clone().add(new THREE.Vector3(-2, 0, -1)), q, j * n + i, n, () => { explosion(q, k === 'energy' ? 4 : 3, k === 'energy' ? 0xff7a1a : 0xff9a5a); if (k === 'energy') beamUp(q, 0xff7a1a, 3000, 1.2); }, { dur: k === 'irbm' ? 1500 : 2000, gap: k === 'irbm' ? 120 : 260, color: k === 'airstrikes' ? 0xffb35c : 0xff6a2b, h: k === 'irbm' ? .8 : .35 }); } }); tHit = 3200 + tp.length * n * 200; }
-  scT(() => showScenFx(sc), tHit + 1600);
+  const k = sc.kind; let tHit = 4000; const at = (ms, f) => scT(f, ms);
+  const alt = p => Math.max(hAt(p.x, p.z), 0);
+  const b2run = (target, { drops = 1, L = .1, delay = 0, onHit, alt: A = 1.1, len = 4, dur = 5200 } = {}) => { const a = target.clone().addScaledVector(dir, -len), b = target.clone().addScaledVector(dir, len * .9); a.y = b.y = alt(target) + A;
+    const rel = .5 - .35 / len; const g = b2Mesh(); for (const x of [-.3, .3]) { const c = new THREE.Object3D(); c.position.set(x, 0, -.2); g.add(c); trailFX(g, 0xffffff, .05, 45); break; } fly(g, u => { const p = a.clone().lerp(b, u); p.y += u > rel ? (u - rel) * .9 : 0; return p; }, dur, { delay, bank: .25,
+      onT: [...Array(drops)].map((_, i) => [rel - .02 + i * .025, p => dropBomb(p, target.clone().addScaledVector(side, (i - (drops - 1) / 2) * .05), { L, dur: 1500, onHit })]) }); return dur * rel + delay + 1500; };
+  if (k === 'nuclear') {
+    const RR = nukeRadii(sc.yield_kt, sc.burst === 'surface'); const mag = Math.max(1, .6 / scKm(T0.lat, T0.lon, RR[4][1])); const R = { r1: scKm(T0.lat, T0.lon, RR[4][1]) * mag, r5: scKm(T0.lat, T0.lon, RR[2][1]) * mag };
+    const azS = Math.atan2(side.x, side.z); camTo(tp[0].clone().addScaledVector(dir, -2.0).setY(tp[0].y + 1.0), 3.6, 1.15, azS, true); scT(() => camTo(tp[0].clone().setY(tp[0].y + .6), 3.6, 1.12, azS), 2400); caption('B-2 inbound (simulated aircraft, illustrative route)');
+    const tDrop = b2run(tp[0], { L: .12, dur: 7000, onHit: p => { caption(`Detonation · ${sc.yield_kt} kt (assumed) · surface burst`); nukeDetonate(tp[0], R, sc); camTo(tp[0].clone().setY(tp[0].y + .9), 6, 1.1, azS);
+      RR.forEach((r, i) => scT(() => scRing(T0.lat, T0.lon, r[1], r[2], r[0], mag), 2200 + i * 500)); scT(() => caption('Damage zones · estimates (rings drawn ×' + Math.round(mag) + ')'), 2600);
+      if (sc.fallout) scT(() => { scFallout(T0.lat, T0.lon, sc.fallout.dir_deg, 160); caption('Fallout plume · illustrative, wind-dependent'); }, 6000); } });
+    at(tDrop - 1500, () => caption('Weapon release')); tHit = tDrop + 7000;
+  } else if (k === 'bunker') {
+    caption('B-2s inbound with GBU-57 penetrators (simulated)'); camTo(ctr, 7.5, 1.08, null, true);
+    tp.forEach((p, i) => { const tt = b2run(p, { drops: 2, L: .13, delay: i * 2600, len: 3.5, onHit: q => { groundHit(q, 4, 0x8a6a4a, 3500); dustRing(q, .35, 2200); smokePlume(q, { h: .6, w: .08, rate: 10, life: 3, col: 0x8a7560 });
+      scT(() => { explosion(q, 3, 0xffb060); decal(q, .12, CRATER, 1, .4); smokePlume(q, { h: .7, w: .05, rate: 3, life: 5, col: 0x3a3430, glow: .6 }); shake = .8; caption('Penetration · delayed underground detonation'); }, 650); } }); tHit = Math.max(tHit, tt + 2600); });
+  } else if (k === 'mines') {
+    caption('Tankers transiting · mines laid (simulated)'); camTo(ctr, 4.8, 1.08, null, true);
+    tp.forEach((p, i) => { const a = p.clone().addScaledVector(side, -1.4 + i * .2), sh = shipMesh('tanker'); a.y = p.y = 0;
+      fly(sh, u => { const q = a.clone().lerp(p, Math.min(1, u * 1.15)); q.y = .0; return q; }, 4200, { delay: i * 900, keep: true, end: q => { waterSpout(q, 1.3); explosion(q, 3, 0xffa040); sh.rotation.z = .25; sh.position.y = -.03;
+        fires(q, .06, 3); smokePlume(q, { h: 1.1, w: .1, rate: 7, life: 6, col: 0x161412, glow: .8 }); decal(q, .45, SLICK, .9, 6); caption('Mine strike · tanker ablaze · oil slick'); } }); });
+    at(5600, () => { const a = ground(26.95, 56.15), b = ground(26.2, 56.6); const g = new THREE.BufferGeometry().setFromPoints([a.setY(.06), b.setY(.06)]); const ln = SCA(new THREE.Line(g, new THREE.LineDashedMaterial({ color: 0xff3030, dashSize: .06, gapSize: .04 }))); ln.computeLineDistances(); caption('Strait closed (illustrative barrier)'); });
+    tHit = 7600;
+  } else if (k === 'energy') {
+    caption('Drone swarm & cruise missiles inbound (simulated)'); camTo(ctr, 5.5, 1.08, null, true);
+    tp.forEach((p, i) => { for (let j = 0; j < 5; j++) { const st = o.clone().add(side.clone().multiplyScalar((j - 2) * .25)); st.y = alt(st) + .35; const en = p.clone().add(new THREE.Vector3((Math.random() - .5) * .15, .02, (Math.random() - .5) * .15));
+      const d = j === 0 ? missileMesh(.1) : droneMesh(); fly(d, u => { const q = st.clone().lerp(en, u); q.y = (1 - u) * st.y + u * en.y + Math.sin(u * Math.PI) * .25; return q; }, 4200 + j * 180, { delay: i * 500 + j * 220, end: q => { impact(q, 3, { col: 0xff7a1a }); if (j === 1) { fires(q, .12, 6); smokePlume(q, { h: 1.5, w: .14, rate: 8, life: 7, col: 0x131110, glow: 1 }); } } }); } });
+    at(5200, () => caption('Facilities hit · fires and black smoke')); tHit = 7000;
+  } else if (k === 'blockade') {
+    caption('PLA naval forces encircle Taiwan (simulated)'); camTo(ground(23.7, 121), 9);
+    tp.forEach((p, i) => { for (let j = 0; j < 2; j++) { const s0 = o.clone().add(side.clone().multiplyScalar(j * .3)); s0.y = 0; const e = p.clone().add(new THREE.Vector3(j * .25, 0, j * .2)); e.y = 0; fly(shipMesh('warship', .24), lerpV(s0, e), 4800, { delay: i * 400 + j * 300, keep: true }); } });
+    at(4600, () => { scRing(23.7, 121.0, 230, '#ff4b3e', 'Exclusion zone (illustrative)'); caption('Exclusion zone declared'); });
+    at(6000, () => { const tk = shipMesh('tanker'); const a = ground(21.2, 124), b = ground(22.4, 122.8); a.y = b.y = 0; fly(tk, lerpV(a, b), 2600, { keep: true, end: q => { ringPulse(q, 0xff4b3e, .5, 1500, 3, 300); caption('Merchant shipping turned away'); } }); });
+    tHit = 8600;
+  } else if (k === 'nuketest') {
+    caption('Underground test at Punggye-ri (simulated)'); camTo(tp[0], 4.5, 1.08, null, true);
+    at(1200, () => { groundHit(tp[0], 5, 0xffd166, 6000); shake = 1.4; vib([60, 40, 60]); dustRing(tp[0], .6, 3000, 0xb09a80); for (let i = 0; i < 6; i++) scT(() => ringPulse(tp[0], 0xffd166, 3.2, 3400, 1), i * 450); smokePlume(tp[0], { h: .4, w: .12, rate: 6, life: 3, col: 0xa08c74 }); caption('Seismic shock · M6-class signal in 2017 precedent'); });
+    at(3200, () => { decal(tp[0], .3, CRATER, .7, 2); scRing(T0.lat, T0.lon, 50, '#ffd166', 'Seismic waves (illustrative)'); });
+    tHit = 4800;
+  } else if (k === 'shelling') {
+    caption('Artillery batteries open fire (simulated)'); camTo(tp[0].clone().lerp(o, .35), 3.6);
+    for (let i = 0; i < 18; i++) { const s0 = o.clone().add(side.clone().multiplyScalar((i % 6 - 2.5) * .12)); s0.y = alt(s0) + .02; const e = tp[0].clone().add(new THREE.Vector3((Math.random() - .5) * .25, 0, (Math.random() - .5) * .25)); e.y = alt(e);
+      at(400 + i * 160, () => { const f = add(sprite(GLOW, new THREE.Color(0xffe0a0), .12)); f.position.copy(s0); fade(f, f.material, 250, u => f.material.opacity = 1 - u); });
+      const shl = sprite(GLOW, new THREE.Color(0xffc070), .06); trailFX(shl, 0x8a8580, .025, 50); fly(shl, arcF(s0, e, .45), 1400, { delay: 400 + i * 160, end: q => impact(q, 2, { smoke: i % 4 === 0 }) }); }
+    at(3400, () => { fires(tp[0], .15, 8); caption('Island hit · fires · counter-battery fire'); for (let i = 0; i < 6; i++) { const s0 = tp[0].clone(); const e = o.clone().add(side.clone().multiplyScalar((i - 3) * .12)); e.y = alt(e); const shl = sprite(GLOW, new THREE.Color(0xffc070), .06); fly(shl, arcF(s0, e, .45), 1400, { delay: i * 150, end: q => impact(q, 2, { smoke: false }) }); } });
+    tHit = 6200;
+  } else if (k === 'water') {
+    caption('Upstream flow restricted (simulated)'); camTo(tp[0].clone().lerp(o, .5), 6);
+    const pts = [...Array(30)].map((_, i) => { const u = i / 29; const q = o.clone().lerp(tp[0], u); q.x += Math.sin(u * 9) * .12; q.y = alt(q) + .03; return q; });
+    const rv = SCA(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 60, .025, 6), new THREE.MeshBasicMaterial({ color: 0x3fb6ff, transparent: true, opacity: .9 })));
+    scLoop(rv, t => { const k2 = Math.max(.15, 1 - t / 5); rv.scale.set(1, 1, 1); rv.material.opacity = .9 * k2; rv.material.color.setRGB(.25 + .5 * (1 - k2), .7 * k2 + .5 * (1 - k2), 1 * k2 + .3 * (1 - k2)); });
+    at(600, () => { const dam = SCA(new THREE.Mesh(new THREE.BoxGeometry(.22, .06, .04), PBR(0xb8b8b8))); dam.position.copy(o).y = alt(o) + .04; dam.lookAt(tp[0].clone().setY(dam.position.y)); caption('Dam / flow control (illustrative)'); });
+    at(2600, () => { decal(tp[0], .9, DRY, .85, 4); caption('Downstream farmland water stress (illustrative)'); });
+    tHit = 6000;
+  } else if (k === 'antiship') {
+    caption('Anti-ship missile launched (simulated)'); camTo(tp[0], 4, 1.08, null, true);
+    const tk = shipMesh('tanker'); const a = tp[0].clone().addScaledVector(side, -1.2); a.y = 0; const b = tp[0].clone(); b.y = 0; fly(tk, lerpV(a, b), 4600, { keep: true });
+    const m = missileMesh(.12); trailFX(m); const s0 = o.clone(); s0.y = alt(o) + .05; fly(m, u => { const q = s0.clone().lerp(b, u); q.y = .05 + Math.sin(u * Math.PI) * .5 * (u < .6 ? 1 : .2); return q; }, 3600, { delay: 1000, end: q => { explosion(q, 4, 0xffa040); fires(q, .05, 3); smokePlume(q, { h: 1, w: .1, rate: 7, life: 6, col: 0x161412, glow: .8 }); decal(q, .35, SLICK, .9, 6); tk.rotation.z = .2; caption('Tanker hit · fire · shipping reroutes'); } });
+    tHit = 6600;
+  } else if (k === 'airstrikes') {
+    caption('Strike aircraft inbound (simulated)'); camTo(ctr, 4.6, 1.08, null, true);
+    tp.forEach((p, i) => { for (let j = 0; j < 3; j++) { const off = side.clone().multiplyScalar((j - 1) * .18); const a = p.clone().addScaledVector(dir, -4).add(off), b = p.clone().addScaledVector(dir, 4).add(off); a.y = b.y = alt(p) + .9;
+      const jm = jetMesh2(); fly(jm, lerpV(a, b), 3800, { delay: i * 1200 + j * 250, onT: [[.47, q => dropBomb(q, p.clone().add(off.clone().multiplyScalar(.5)).addScaledVector(dir, (j - 1) * .08), { L: .06, dur: 900, onHit: h => { impact(h, 3); fires(h, .05, 2); } })]] }); } });
+    at(3800, () => caption('Bombs on target · smoke columns · burn scars')); tHit = 6000 + tp.length * 1000;
+  } else if (k === 'irbm') {
+    caption('Intermediate-range ballistic missile launch (simulated)'); camTo(tp[0].clone().lerp(o, .3), 8);
+    const m = missileMesh(.2); trailFX(m, 0xe8e2d8, .08, 30); const top = o.clone().lerp(tp[0], .5); top.y += 3.2; const c = new THREE.QuadraticBezierCurve3(o.clone().setY(alt(o)), top, tp[0].clone().setY(alt(tp[0]) + 1.6));
+    fly(m, u => c.getPoint(u), 3600, { end: q => { caption('Multiple warheads separate'); camTo(tp[0], 4.5, 1.08, null, true); for (let i = 0; i < 6; i++) { const e = tp[0].clone().add(new THREE.Vector3((Math.random() - .5) * .5, 0, (Math.random() - .5) * .5)); e.y = alt(e); 
+      const rv = new THREE.Object3D(); const g2 = sprite(GLOW, new THREE.Color(0xffe8b0), .1); rv.add(g2); trailFX(rv, 0xffd8a0, .03, 20); fly(rv, lerpV(q.clone().add(new THREE.Vector3((i - 3) * .05, 0, 0)), e), 1200 + i * 90, { end: h => impact(h, 3) }); } } });
+    tHit = 6200;
+  } else { // barrage / rockets: ballistic missiles or rocket salvos, with interceptors where the precedent had them
+    const rockets = k === 'rockets'; const n = rockets ? 14 : 4; caption(rockets ? 'Rocket salvo launched (simulated)' : 'Ballistic missile salvo launched (simulated)'); camTo(ctr.clone().lerp(o, .25), rockets ? 4.8 : 7.5);
+    const intercept = /intercept/i.test(sc.claim); let idx = 0;
+    tp.forEach((p, i) => { for (let j = 0; j < (rockets ? Math.ceil(n / tp.length) : n); j++) { const me = idx++; const s0 = o.clone().add(side.clone().multiplyScalar((Math.random() - .5) * .5)); s0.y = alt(s0) + .02; const e = p.clone().add(new THREE.Vector3((Math.random() - .5) * .25, 0, (Math.random() - .5) * .25)); e.y = alt(e);
+      const m = rockets ? missileMesh(.06) : missileMesh(.14); trailFX(m, 0xe0dcd4, rockets ? .03 : .06); const H = rockets ? .6 : Math.max(1.2, s0.distanceTo(e) * .35); const dur = rockets ? 2200 : 3400; const killed = intercept && me % 5 !== 4;
+      fly(m, arcF(s0, e, H), dur, { delay: me * (rockets ? 120 : 260), onT: killed ? [[.82, q => { m.visible = false; const f = add(sprite(GLOW, new THREE.Color(0xfff0d0), .25)); f.position.copy(q); fade(f, f.material, 600, u => { f.material.opacity = 1 - u; f.scale.setScalar(.25 + u * .3); }); }]] : [], end: q => { if (!killed) impact(q, rockets ? 2 : 3); } });
+      if (killed) { const ic = missileMesh(.05, 0xcfd8e0); trailFX(ic, 0xf0f0f0, .025); const hitPt = arcF(s0, e, H)(.82); const s1 = p.clone(); s1.y = alt(p); fly(ic, arcF(s1, hitPt, .2), 900, { delay: me * (rockets ? 120 : 260) + dur * .82 - 900 }); } } });
+    at(1800, () => intercept && caption('Air defences intercept most incoming (as in the precedent)')); at(rockets ? 4200 : 5200, () => caption('Impacts · craters · smoke'));
+    tHit = rockets ? 6000 : 7000;
+  }
+  scT(() => showScenFx(sc), tHit + 1200);
 }
+
 function scInset(sc, R) { // true-scale map: rings and nearby cities in km around the target
   const T0 = sc.target || sc.targets[0]; const W = Math.max(R[4][1] * 1.4, 30); const k = 140 / W; const r = Math.PI / 180;
   const xy = (la, lo) => [((lo - T0.lon) * 111.32 * Math.cos(T0.lat * r)) * k, -((la - T0.lat) * 110.57) * k];
@@ -1145,11 +1340,12 @@ function frame(now) {
     off.setLength((F.d0 + (camGoal.dist - F.d0) * e) * (1 + F.arc * Math.sin(Math.PI * e)));
     camera.position.copy(controls.target).add(off); if (u >= 1) camGoal.fl = null;
   } else if (camGoal.target && idle) {
-    const k = 1 - Math.exp(-dt * 1.6);
+    const k = 1 - Math.exp(-dt * (camGoal.polar != null ? 2.6 : 1.6));
     const off = camera.position.clone().sub(controls.target);
     controls.target.lerp(camGoal.target, k);
     const d = off.length(); const nd = d + (camGoal.dist - d) * k * .6; off.setLength(nd);
-    if (!RMQ.matches) off.applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * .02);
+    if (camGoal.polar != null) { const sp = new THREE.Spherical().setFromVector3(off); sp.phi += (camGoal.polar - sp.phi) * k; if (camGoal.az != null) { let da = camGoal.az - sp.theta; da = Math.atan2(Math.sin(da), Math.cos(da)); sp.theta += da * k; } off.setFromSpherical(sp); }
+    else if (!RMQ.matches) off.applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * .02);
     camera.position.copy(controls.target).add(off);
   }
   controls.update();
