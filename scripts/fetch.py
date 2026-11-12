@@ -372,7 +372,7 @@ def cluster(evs):
         locs = [m['loc'] for m in ms if m['loc']]
         if locs:
             kr = {"place": 0, "sea": 1, "metro": 2, "off": 3, "country": 4}
-            c['loc'] = sorted(locs, key=lambda l: (kr[l['kind']], -sum(1 for x in locs if x['name'] == l['name'])))[0]
+            c['loc'] = sorted(locs, key=lambda l: (kr.get(l["kind"], 5), -sum(1 for x in locs if x['name'] == l['name'])))[0]
         for f in ('actor', 'atk', 'icp'):
             vals = [m.get(f) for m in ms if m.get(f)]
             c[f] = max(set(vals), key=vals.count) if vals else None
