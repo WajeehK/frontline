@@ -7,20 +7,29 @@
 <meta name="color-scheme" content="dark">
 <title>Frontline · Live Conflict Tracker</title>
 <meta name="description" content="Live 3D conflict tracker: real news reports from public sources, mapped and animated on a 3D theatre map.">
-<link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
-<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest-v11.webmanifest">
+<link rel="icon" href="icons/b2r-favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="icons/b2r-logo.svg" type="image/svg+xml">
+<link rel="shortcut icon" href="icons/b2r-favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/b2r-apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Frontline">
 <link rel="stylesheet" href="style.css">
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
 </head>
 <body>
+<div id="intro" aria-hidden="true"><div class="ir-grid"></div><div class="ir-rings"></div><div class="ir-sweep"></div><div class="ir-scan"></div><i class="ir-blip" style="left:22%;top:34%"></i><i class="ir-blip" style="left:71%;top:58%;animation-delay:.9s"></i><i class="ir-blip" style="left:58%;top:24%;animation-delay:1.5s"></i>
+<div class="ir-b2 l"><svg viewBox="-106 -48 212 104"><defs><linearGradient id="ib2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d1d9"/><stop offset="1" stop-color="#5b6672"/></linearGradient></defs><path d="M0 -42 L100 26 L98 33 L64 52 L43 37 L22 52 L0 38 L-22 52 L-43 37 L-64 52 L-98 33 L-100 26Z" fill="url(#ib2)" stroke="#0b0f12" stroke-width="2"/><path d="M0 -30 L9 -14 L0 -8 L-9 -14Z" fill="#1d262e"/><path d="M-30 4 L-18 2 M30 4 L18 2" stroke="#2b343c" stroke-width="5" stroke-linecap="round"/></svg></div><div class="ir-b2 c"><svg viewBox="-106 -48 212 104"><defs><linearGradient id="ib2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d1d9"/><stop offset="1" stop-color="#5b6672"/></linearGradient></defs><path d="M0 -42 L100 26 L98 33 L64 52 L43 37 L22 52 L0 38 L-22 52 L-43 37 L-64 52 L-98 33 L-100 26Z" fill="url(#ib2)" stroke="#0b0f12" stroke-width="2"/><path d="M0 -30 L9 -14 L0 -8 L-9 -14Z" fill="#1d262e"/><path d="M-30 4 L-18 2 M30 4 L18 2" stroke="#2b343c" stroke-width="5" stroke-linecap="round"/></svg></div><div class="ir-b2 r"><svg viewBox="-106 -48 212 104"><defs><linearGradient id="ib2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d1d9"/><stop offset="1" stop-color="#5b6672"/></linearGradient></defs><path d="M0 -42 L100 26 L98 33 L64 52 L43 37 L22 52 L0 38 L-22 52 L-43 37 L-64 52 L-98 33 L-100 26Z" fill="url(#ib2)" stroke="#0b0f12" stroke-width="2"/><path d="M0 -30 L9 -14 L0 -8 L-9 -14Z" fill="#1d262e"/><path d="M-30 4 L-18 2 M30 4 L18 2" stroke="#2b343c" stroke-width="5" stroke-linecap="round"/></svg></div>
+<div class="ir-word"><img src="icons/b2r-logo.svg" alt=""><b>FRONTLINE</b><span>LIVE CONFLICT TRACKER</span></div></div>
+<script>(function(){var d=document.documentElement,i=document.getElementById('intro'),n=Date.now(),l=0;try{l=+localStorage.getItem('fl_intro')||0;localStorage.setItem('fl_intro',n)}catch(e){}
+var q=(n-l<45000)||matchMedia('(prefers-reduced-motion: reduce)').matches;if(q)i.classList.add('quick');var t=q?450:3100;
+function done(){if(!i.parentNode)return;i.classList.add('out');setTimeout(function(){i.remove()},520)}setTimeout(done,t);i.addEventListener('pointerdown',done);})();</script>
 <canvas id="scene" aria-label="3D map of the conflict theatre"></canvas>
 <div id="labels" aria-hidden="true"></div>
 <div id="vign" aria-hidden="true"></div>
 
 <header id="hud" class="loading">
  <div class="row1">
-  <div class="brand"><img src="icons/logo.svg" alt=""><b>FRONTLINE</b></div>
+  <div class="brand"><img src="icons/b2r-logo.svg" alt=""><b>FRONTLINE</b></div>
   <button id="thBtn" class="glass chip" aria-haspopup="listbox"><span id="thName">US vs Iran</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
  </div>
  <div class="glass meters">
@@ -66,6 +75,7 @@
 <aside id="sides" class="sheet glass" aria-label="Sides scoreboard"><div class="grab"></div><div class="shead"><h2>Sides · reported events</h2></div><div id="sidesBody" class="slist"><div class="skel"><i></i><i></i></div><div class="skel"><i></i><i></i></div><div class="skel"><i></i><i></i></div><div class="skel"><i></i><i></i></div></div></aside>
 <aside id="scen" class="sheet glass" aria-label="Scenarios"><div class="grab"></div><div class="shead"><h2>What-if scenarios <span class="hypo">HYPOTHETICAL</span></h2></div><div id="scenBody" class="slist prose"></div></aside>
 <div id="scFlash"></div><div id="scCap" aria-live="polite"></div><div id="scBar" aria-live="polite"><b>⚠ HYPOTHETICAL · SIMULATION</b><span id="scBarT"></span><button id="scBarX" aria-label="End simulation">✕</button></div>
+<div id="cine"><div class="lb lt"><span id="cineTag">HYPOTHETICAL · SIMULATION</span><b id="cineT"></b><button id="cineX" aria-label="End simulation">✕</button></div><div class="lb lbm"><div class="prog"><i id="cineP"></i></div></div></div>
 <aside id="opts" class="sheet glass" aria-label="Layers and alerts"><div class="grab"></div><div class="shead"><h2>Alerts & layers</h2></div><div id="optsBody" class="slist prose"></div></aside>
 <div id="brk" aria-live="assertive"></div>
 <article id="story" class="sheet glass" aria-label="Story" aria-modal="true"></article>
@@ -75,12 +85,14 @@
 <aside id="about" class="sheet glass" aria-label="About">
  <div class="grab"></div>
  <div class="slist prose" id="aboutBody"></div>
- <p class="ver">Frontline v10 · map imagery: Sentinel-2 cloudless by EOX (CC BY 4.0)</p>
+ <p class="ver">Frontline v11 · imagery: Sentinel-2 cloudless by EOX (CC BY 4.0) · terrain &amp; hi-res relief: AWS Terrain Tiles (Mapzen, open data)</p>
 </aside>
 
 <div id="thSheet" class="sheet glass small" role="listbox" aria-label="Choose conflict"><div class="grab"></div><div class="shead"><h2>Conflicts</h2></div><div id="thList" class="slist"></div></div>
 <div id="scrim"></div>
-<div id="boot"><img src="icons/logo.svg" alt=""><span>Loading theatre…</span></div>
+<div id="gScrim"></div>
+<aside id="gauges" class="glass" aria-label="Indicators" aria-hidden="true"><div class="gHead"><div><small>INDICATORS · LIVE DATA</small><h2 id="gTh">–</h2></div><button id="gX" aria-label="Close indicators">✕</button></div><div id="gBody"></div><div class="gGrab" role="button" tabindex="0" aria-label="Close indicators"><i></i></div></aside>
+<div id="boot"><img src="icons/b2r-logo.svg" alt=""><span>Loading theatre…</span></div>
 <noscript>Frontline needs JavaScript and WebGL.</noscript>
 <script type="module" src="app.js"></script>
 </body>
