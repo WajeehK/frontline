@@ -1204,10 +1204,10 @@ addEventListener('keydown', e => { if (e.key === 'Escape' && $('#gauges').classL
 { // pull the top card down to open; swipe the sheet up to close; a tap on the card also opens
   const card = $('#hud .meters'), g = $('#gauges'); let d = null;
   card.addEventListener('pointerdown', e => { if (e.button > 0) return; d = { y: e.clientY, t: performance.now(), dy: 0, id: e.pointerId }; });
-  card.addEventListener('pointermove', e => { if (!d || e.pointerId !== d.id) return; d.dy = e.clientY - d.y; if (d.dy > 8) { if (!d.cap) { d.cap = 1; try { card.setPointerCapture(e.pointerId); } catch (_) { } g.classList.add('drag'); renderGauges(); } g.style.transform = `translate3d(0,calc(-100% + ${Math.min(d.dy * 1.4, innerHeight)}px),0)`; $('#gScrim').classList.add('on'); } });
+  addEventListener('pointermove', e => { if (!d || e.pointerId !== d.id) return; d.dy = e.clientY - d.y; if (d.dy > 8) { if (!d.cap) { d.cap = 1; g.classList.add('drag'); renderGauges(); } g.style.transform = `translate3d(0,calc(-100% + ${Math.min(d.dy * 1.4, innerHeight)}px),0)`; $('#gScrim').classList.add('on'); } });
   const end = e => { if (!d) return; const { dy, t, cap } = d; d = null; g.classList.remove('drag'); if (cap) { card._drag = performance.now(); if (dy > 70) openGauges(); else closeGauges(); } };
   card.addEventListener('click', e => { if (performance.now() - (card._drag || 0) < 400 || e.target.closest('#sent')) return; openGauges(); });
-  card.addEventListener('pointerup', end); card.addEventListener('pointercancel', () => { d = null; g.classList.remove('drag'); closeGauges(); });
+  addEventListener('pointerup', end); addEventListener('pointercancel', e => { if (!d) return; const c = d.cap; d = null; g.classList.remove('drag'); if (c) closeGauges(); });
   let u = null; g.addEventListener('pointerdown', e => { if (!e.target.closest('.gGrab, .gHead') || e.target.closest('button')) return; u = { y: e.clientY, dy: 0, id: e.pointerId }; try { g.setPointerCapture(e.pointerId); } catch (_) { } g.classList.add('drag'); });
   g.addEventListener('pointermove', e => { if (!u || e.pointerId !== u.id) return; u.dy = Math.min(0, e.clientY - u.y); g.style.transform = `translate3d(0,${u.dy}px,0)`; });
   const up = () => { if (!u) return; const { dy } = u; u = null; g.classList.remove('drag'); if (dy < -60) closeGauges(); else g.style.transform = ''; };

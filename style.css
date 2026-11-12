@@ -532,7 +532,7 @@ body.cine #scCap{top:auto;bottom:calc(var(--safeB,0px) + 22px);z-index:42;backgr
 #labels .scT.ret{color:#ff8a7e;border-color:#ff5a4a;background:rgba(30,6,4,.75)}#labels .scT.ret b{background:#ff5a4a;color:#fff}
 
 /* v11 indicators sheet (pull the top card down) */
-#hud .meters{touch-action:pan-x;cursor:pointer}
+#hud .meters{touch-action:none;cursor:pointer;-webkit-user-select:none;user-select:none}
 #gScrim{position:fixed;inset:0;z-index:44;background:rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .3s}
 #gScrim.on{opacity:1;pointer-events:auto}
 #gauges{position:fixed;left:0;right:0;top:0;z-index:45;max-height:92vh;max-height:92dvh;display:flex;flex-direction:column;border-radius:0 0 22px 22px;padding-top:var(--safeT,0px);transform:translate3d(0,-102%,0);transition:transform .45s cubic-bezier(.2,.9,.25,1);background:rgba(8,10,12,.94);touch-action:none}
