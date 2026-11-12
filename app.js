@@ -1203,11 +1203,16 @@ $('#gBody').addEventListener('click', e => { if (e.target.id === 'gSent') { e.pr
 addEventListener('keydown', e => { if (e.key === 'Escape' && $('#gauges').classList.contains('open')) closeGauges(); });
 { // pull the top card down to open; swipe the sheet up to close; a tap on the card also opens
   const card = $('#hud .meters'), g = $('#gauges'); let d = null;
+  const hud = $('#hud');
   card.addEventListener('pointerdown', e => { if (e.button > 0) return; d = { y: e.clientY, t: performance.now(), dy: 0, id: e.pointerId }; });
-  addEventListener('pointermove', e => { if (!d || e.pointerId !== d.id) return; d.dy = e.clientY - d.y; if (d.dy > 8) { if (!d.cap) { d.cap = 1; g.classList.add('drag'); renderGauges(); } g.style.transform = `translate3d(0,calc(-100% + ${Math.min(d.dy * 1.4, innerHeight)}px),0)`; $('#gScrim').classList.add('on'); } });
-  const end = e => { if (!d) return; const { dy, t, cap } = d; d = null; g.classList.remove('drag'); if (cap) { card._drag = performance.now(); if (dy > 70) openGauges(); else closeGauges(); } };
+  addEventListener('pointermove', e => { if (!d || e.pointerId !== d.id) return; d.dy = e.clientY - d.y;
+    if (d.dy < -8 && !d.cap) { d.up = 1; hud.style.transition = 'none'; hud.style.transform = `translate3d(0,${d.dy}px,0)`; hud.style.opacity = String(Math.max(.2, 1 + d.dy / 220)); return; } // push up: card follows the finger
+    if (d.up) { hud.style.transform = `translate3d(0,${Math.min(0, d.dy)}px,0)`; return; }
+    if (d.dy > 8) { if (!d.cap) { d.cap = 1; g.classList.add('drag'); renderGauges(); } g.style.transform = `translate3d(0,calc(-100% + ${Math.min(d.dy * 1.4, innerHeight)}px),0)`; $('#gScrim').classList.add('on'); } });
+  const end = e => { if (!d) return; const { dy, t, cap, up } = d; d = null; g.classList.remove('drag');
+    if (up) { card._drag = performance.now(); hud.style.transition = ''; hud.style.transform = ''; hud.style.opacity = ''; if (dy < -40) setHud(true); return; } if (cap) { card._drag = performance.now(); if (dy > 70) openGauges(); else closeGauges(); } };
   card.addEventListener('click', e => { if (performance.now() - (card._drag || 0) < 400 || e.target.closest('#sent')) return; openGauges(); });
-  addEventListener('pointerup', end); addEventListener('pointercancel', e => { if (!d) return; const c = d.cap; d = null; g.classList.remove('drag'); if (c) closeGauges(); });
+  addEventListener('pointerup', end); addEventListener('pointercancel', e => { if (!d) return; const c = d.cap; d = null; g.classList.remove('drag'); hud.style.transition = ''; hud.style.transform = ''; hud.style.opacity = ''; if (c) closeGauges(); });
   let u = null; g.addEventListener('pointerdown', e => { if (!e.target.closest('.gGrab, .gHead') || e.target.closest('button')) return; u = { y: e.clientY, dy: 0, id: e.pointerId }; try { g.setPointerCapture(e.pointerId); } catch (_) { } g.classList.add('drag'); });
   g.addEventListener('pointermove', e => { if (!u || e.pointerId !== u.id) return; u.dy = Math.min(0, e.clientY - u.y); g.style.transform = `translate3d(0,${u.dy}px,0)`; });
   const up = () => { if (!u) return; const { dy } = u; u = null; g.classList.remove('drag'); if (dy < -60) closeGauges(); else g.style.transform = ''; };
