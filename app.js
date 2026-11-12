@@ -1174,28 +1174,54 @@ function openSent() {
 }
 $('#sent').addEventListener('click', e => { e.stopPropagation(); openGauges(); });
 // ---- v11 indicators sheet: tap the top card or pull it down. Every number below is computed from data the app already loaded.
-function gArc(v, lo, hi, col, big, cap, sub = '') { const u = Math.max(0, Math.min(1, (v - lo) / (hi - lo))); const a = Math.PI * (1 - u), x = 60 + 46 * Math.cos(a), y = 58 - 46 * Math.sin(a);
-  return `<div class="gg"><svg viewBox="0 0 120 70"><path d="M14 58A46 46 0 0 1 106 58" class="gt"/><path d="M14 58A46 46 0 0 1 106 58" class="gv" style="stroke:${col};stroke-dasharray:${(u * 144.5).toFixed(1)} 200"/><line x1="60" y1="58" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}" class="gn"/><circle cx="60" cy="58" r="3.5" fill="#fff"/></svg><b style="color:${col}">${big}</b><span>${cap}</span>${sub ? `<small>${sub}</small>` : ''}</div>`; }
-function gBar(lbl, v, max, col, txt) { return `<div class="gb"><span>${lbl}</span><div><i style="width:${max ? Math.min(100, v / max * 100).toFixed(1) : 0}%;background:${col}"></i></div><em>${txt ?? v}</em></div>`; }
-function gSpark(arr, col) { if (!arr || arr.length < 2) return ''; const vs = arr.map(x => x[1]); const mn = Math.min(...vs), mx = Math.max(...vs), r = mx - mn || 1; return `<svg class="gs" viewBox="0 0 100 24" preserveAspectRatio="none"><polyline fill="none" stroke="${col}" stroke-width="1.6" points="${vs.map((v, i) => `${(i / (vs.length - 1) * 100).toFixed(1)},${(22 - (v - mn) / r * 20).toFixed(1)}`).join(' ')}"/></svg>`; }
 function renderGauges() { const m = S.m; if (!m || !S.th) return; $('#gTh').textContent = S.th.name; const T = m.T; const A = $('#sideA').textContent, B = $('#sideB').textContent;
+  const lvC = v => (LV.find(l => v < l[0]) || LV[4])[2]; const N = v => Number(v).toLocaleString('en-GB');
   const days = [...Array(7)].map((_, i) => { const t1 = T - i * 86400; return escOf(score(clustersIn(t1 - 86400, t1))); }).reverse();
-  const d7 = clustersIn(T - 7 * 86400, T), d1 = clustersIn(T - 86400, T); const byT = {}; d7.forEach(e => byT[e.type] = (byT[e.type] || 0) + 1); const tmax = Math.max(1, ...Object.values(byT));
-  const sev = [0, 0, 0, 0, 0, 0]; d1.forEach(e => sev[e.sev] = (sev[e.sev] || 0) + 1); const smax = Math.max(1, ...sev); const low = d7.filter(e => e.lowrel).length; const outlets = new Set(d7.map(e => e.outlet)).size;
-  const x = sentInfo(); const sv = x && x.score != null ? x.score : null; const sCol = sv == null ? '#888' : sv > .25 ? '#ff6b4a' : sv < -.25 ? '#3ccf7e' : '#c9b52e';
-  const kin = d1.filter(e => KIN.has(e.type)).length; const [w, s, e2, n] = S.th.bbox || BB; const inB = (la, lo) => la >= s && la <= n && lo >= w && lo <= e2;
+  const d7 = clustersIn(T - 7 * 86400, T), d1 = clustersIn(T - 86400, T);
+  const kin1 = d1.filter(e => KIN.has(e.type)).length, kin7 = d7.filter(e => KIN.has(e.type)).length, out1 = new Set(d1.map(e => e.outlet)).size, out7 = new Set(d7.map(e => e.outlet)).size;
+  const byT = {}; d7.forEach(e => byT[e.type] = (byT[e.type] || 0) + 1); const types = Object.entries(byT).sort((a, b) => b[1] - a[1]); const tmax = Math.max(1, ...types.map(t => t[1]));
+  const sev = [0, 0, 0, 0, 0, 0]; d1.forEach(e => sev[e.sev] = (sev[e.sev] || 0) + 1); const sTot = d1.length || 1; const SEVC = ['', '#3ccf7e', '#9bc54a', '#c9b52e', '#ff9a2b', '#ff4b3e'];
+  const low = d7.filter(e => e.lowrel).length, rel = d7.length - low;
+  const x = sentInfo(); const sv = x && x.score != null ? x.score : null; const sW = sv == null ? 'INSUFFICIENT DATA' : sv > .25 ? 'ESCALATING' : sv < -.25 ? 'DE-ESCALATING' : 'MIXED'; const sCol = sv == null ? '#8a929b' : sv > .25 ? '#ff6b4a' : sv < -.25 ? '#3ccf7e' : '#c9b52e';
+  const [w, s, e2, n] = S.th.bbox || BB; const inB = (la, lo) => la >= s && la <= n && lo >= w && lo <= e2;
   const ac = S.extras.ac, nav = S.extras.nav, mk = S.extras.mkt; const acN = ac && ac.ac ? ac.ac.filter(a => inB(a.lat, a.lon)).length : null; const nvN = nav && nav.reports ? nav.reports.filter(r => inB(r.lat, r.lon) && T - r.ts < 14 * 86400).length : null;
-  const th = ((S.index && S.index.theatres) || []).slice().sort((a, b) => b.esc24 - a.esc24); const lvC = v => (LV.find(l => v < l[0]) || LV[4])[2];
-  $('#gBody').innerHTML = `<div class="gRow">${gArc(m.e24, 0, 100, m.lv[2], m.e24, 'ESCALATION · 24H', m.lv[1])}${gArc(m.e7, 0, 100, lvC(m.e7), m.e7, 'ESCALATION · 7D AVG', m.e24 > m.e7 + 5 ? '↑ rising' : m.e24 < m.e7 - 5 ? '↓ easing' : '→ steady')}${gArc(sv == null ? 0 : sv, -1, 1, sCol, sv == null ? '–' : (sv > 0 ? '+' : '') + sv.toFixed(2), 'COVERAGE TONE', sv == null ? 'not enough reports' : x.n + ' headlines')}</div>
-  <h4>Escalation · last 7 days</h4><div class="gDays">${days.map((v, i) => `<div><i style="height:${Math.max(3, v)}%;background:${lvC(v)}"></i><span>${v}</span><em>${i === 6 ? 'today' : '−' + (6 - i) + 'd'}</em></div>`).join('')}</div>
-  <h4>Front line · 7-day kinetic pressure</h4><div class="gTug"><span class="sa">${esc(A)}</span><div><i style="width:${m.front.toFixed(1)}%"></i></div><span class="sb">${esc(B)}</span></div><p class="gNote">${m.pa} kinetic reports attributed to ${esc(A)} · ${m.pb} to ${esc(B)} (weighted by severity)</p>
-  <div class="gTiles"><div><b>${m.n24}</b><span>incidents · 24h</span></div><div><b>${kin}</b><span>kinetic · 24h</span></div><div><b>${m.n7}</b><span>incidents · 7d</span></div><div><b>${outlets}</b><span>outlets · 7d</span></div>${acN != null ? `<div><b>${acN}</b><span>military aircraft in area now <small>(${ac.total ?? ac.ac.length} tracked)</small></span></div>` : ''}${nvN != null ? `<div><b>${nvN}</b><span>warship reports · 14d</span></div>` : ''}</div>
-  <h4>Severity mix · 24h</h4>${[5, 4, 3, 2, 1].map(k => gBar('S' + k, sev[k] || 0, smax, ['', '#5a8', '#9b5', '#cb3', '#f83', '#f34'][k])).join('')}
-  <h4>Report types · 7d</h4>${Object.entries(byT).sort((a, b) => b[1] - a[1]).map(([t, v]) => gBar(`${(TY[t] || ['', '•'])[1]} ${(TY[t] || [t])[0]}`, v, tmax, (TY[t] || [0, 0, '#aaa'])[2])).join('') || '<p class="gNote">No reports in the window.</p>'}
-  <h4>Source reliability · 7d</h4>${gBar('Mainstream / wire', d7.length - low, d7.length || 1, '#7fd8ff')}${gBar('Low reliability', low, d7.length || 1, '#c79b5a')}
-  ${mk && mk.q ? `<h4>Markets <em>${esc(mk.src || '')}</em></h4><div class="gMk">${mk.q.map(q => `<div><span>${esc(q.name)}</span><b>${q.last}</b><em class="${q.ch >= 0 ? 'up' : 'dn'}">${q.ch >= 0 ? '+' : ''}${(+q.ch).toFixed(2)}%</em>${gSpark(q.series, q.ch >= 0 ? '#3ccf7e' : '#ff6b4a')}</div>`).join('')}</div>` : ''}
-  <h4>All theatres · escalation 24h</h4>${th.map(t => gBar(esc(t.name), t.esc24, 100, lvC(t.esc24), `${t.esc24} · ${t.n24} rep`)).join('')}
-  <p class="gNote">Fixed rules over reported events (same as the top bar). Coverage tone is a word-list score of headlines, not a measure of the conflict. <a href="#" id="gSent">How sentiment works</a></p>`; }
+  const th = ((S.index && S.index.theatres) || []).slice().sort((a, b) => b.esc24 - a.esc24);
+  // hero: thin precise arc, band ticks, needle-free marker
+  const P = u => { const a = Math.PI * (1 - u); return [(60 + 50 * Math.cos(a)).toFixed(2), (56 - 50 * Math.sin(a)).toFixed(2)]; };
+  const arc = (u0, u1) => { const [x0, y0] = P(u0), [x1, y1] = P(u1); return `M${x0} ${y0}A50 50 0 0 1 ${x1} ${y1}`; };
+  const bands = [[0, 15], [15, 35], [35, 60], [60, 80], [80, 100]].map(([a, b], i) => `<path d="${arc(a / 100 + .004, b / 100 - .004)}" stroke="${LV[i][2]}" class="bArc${m.e24 >= a ? ' on' : ''}"/>`).join('');
+  const [mx, my] = P(Math.min(1, m.e24 / 100)); const [ax, ay] = P(Math.min(1, m.e7 / 100));
+  const dlt = m.e24 - m.e7; const trend = dlt > 5 ? `▲ ${dlt} above 7-day avg` : dlt < -5 ? `▼ ${-dlt} below 7-day avg` : `● level with 7-day avg`;
+  const meter = (u, col, mid = false) => `<div class="bMeter${mid ? ' mid' : ''}"><i style="${mid ? (u >= .5 ? `left:50%;width:${((u - .5) * 100).toFixed(1)}%` : `left:${(u * 100).toFixed(1)}%;width:${((.5 - u) * 100).toFixed(1)}%`) : `width:${(u * 100).toFixed(1)}%`};background:${col}"></i>${mid ? '<b></b>' : ''}</div>`;
+  const sec = (t, extra = '') => `<div class="bSec"><span>${t}</span>${extra ? `<em>${extra}</em>` : ''}</div>`;
+  const spark = (arr, col) => { if (!arr || arr.length < 2) return '<svg class="bSpark"></svg>'; const vs = arr.map(q => q[1]); const mn = Math.min(...vs), r = (Math.max(...vs) - mn) || 1; return `<svg class="bSpark" viewBox="0 0 100 20" preserveAspectRatio="none"><polyline fill="none" stroke="${col}" stroke-width="1.3" vector-effect="non-scaling-stroke" points="${vs.map((v, i) => `${(i / (vs.length - 1) * 100).toFixed(1)},${(18 - (v - mn) / r * 16).toFixed(1)}`).join(' ')}"/></svg>`; };
+  const fmtP = v => { const a = Math.abs(v); return a >= 1000 ? N(Math.round(v * 10) / 10) : a >= 100 ? v.toFixed(2) : v.toFixed(2); };
+  $('#gBody').innerHTML = `
+  ${sec('ESCALATION INDEX · 24H', 'fixed rules · 0–100')}
+  <div class="bHero"><div class="bHeroL"><b style="color:${m.lv[2]}">${m.e24}</b><span class="bLv" style="color:${m.lv[2]}">${m.lv[1]}</span><span class="bTr">${trend}</span></div>
+   <svg class="bArcSvg" viewBox="0 0 120 64"><path d="${arc(0, 1)}" class="bArcBg"/>${bands}<circle cx="${ax}" cy="${ay}" r="2.2" class="bAvg"/><circle cx="${mx}" cy="${my}" r="3.6" fill="${m.lv[2]}" class="bMkr"/><text x="10" y="63">0</text><text x="110" y="63" text-anchor="end">100</text><text x="60" y="63" text-anchor="middle" class="bAvgT">○ 7d avg</text></svg></div>
+  <div class="bSup"><div><span>7-DAY AVERAGE</span><b style="color:${lvC(m.e7)}">${m.e7}</b><small>${(LV.find(l => m.e7 < l[0]) || LV[4])[1]}</small>${meter(m.e7 / 100, lvC(m.e7))}</div>
+   <div><span>COVERAGE TONE${x && x.n ? ` · ${x.n} HEADLINES` : ''}</span><b style="color:${sCol}">${sv == null ? '–' : (sv > 0 ? '+' : '') + sv.toFixed(2)}</b><small>${sW}</small>${meter(sv == null ? .5 : (sv + 1) / 2, sCol, true)}</div></div>
+  ${sec('ESCALATION · LAST 7 DAYS')}
+  <div class="bDays">${days.map((v, i) => `<div><em>${v}</em><i style="height:${Math.max(2, v * .62).toFixed(1)}px;background:${lvC(v)}"></i><span>${i === 6 ? 'Today' : '−' + (6 - i) + 'd'}</span></div>`).join('')}</div>
+  ${sec('FRONT LINE · 7-DAY KINETIC PRESSURE', 'severity-weighted')}
+  <div class="bFront"><div class="bFrontH"><span class="sa">${esc(A)} <b>${m.pa}</b></span><span class="sb"><b>${m.pb}</b> ${esc(B)}</span></div><div class="bFrontBar"><i style="width:${m.front.toFixed(1)}%"></i><b></b></div><small>Share of kinetic reports by attributed actor · centre line = parity</small></div>
+  ${sec('ACTIVITY', 'clustered incidents')}
+  <table class="bTab"><thead><tr><th></th><th>24H</th><th>7D</th></tr></thead><tbody>
+   <tr><td>Incidents</td><td>${N(m.n24)}</td><td>${N(m.n7)}</td></tr><tr><td>Kinetic</td><td>${N(kin1)}</td><td>${N(kin7)}</td></tr><tr><td>Reporting outlets</td><td>${N(out1)}</td><td>${N(out7)}</td></tr></tbody></table>
+  ${acN != null || nvN != null ? `${sec('FORCES IN THEATRE')}<div class="bForces">${acN != null ? `<div><span>Military aircraft</span><b>${acN}</b><small>in area now · ${N(ac.total ?? ac.ac.length)} tracked · ADS-B</small></div>` : ''}${nvN != null ? `<div><span>Warship reports</span><b>${nvN}</b><small>last 14 days · USNI</small></div>` : ''}</div>` : ''}
+  ${sec('SEVERITY MIX · 24H', `${d1.length} incidents`)}
+  <div class="bStack">${[5, 4, 3, 2, 1].map(k => sev[k] ? `<i style="flex:${sev[k]};background:${SEVC[k]}"></i>` : '').join('') || '<i style="flex:1;background:rgba(255,255,255,.1)"></i>'}</div>
+  <div class="bLeg">${[5, 4, 3, 2, 1].map(k => `<span><i style="background:${SEVC[k]}"></i>S${k} <b>${sev[k] || 0}</b></span>`).join('')}</div>
+  ${sec('REPORT TYPES · 7D', `${d7.length} incidents`)}
+  ${types.map(([t, v]) => `<div class="bRow"><span><i style="background:${(TY[t] || [0, 0, '#aaa'])[2]}"></i>${esc((TY[t] || [t])[0])}</span><div class="bLine"><i style="width:${(v / tmax * 100).toFixed(1)}%"></i></div><em>${v}</em></div>`).join('') || '<p class="bNote">No reports in the window.</p>'}
+  ${sec('SOURCE RELIABILITY · 7D')}
+  <div class="bSplit"><i style="flex:${rel || 0};background:#7fd8ff"></i><i style="flex:${low || 0};background:#c79b5a"></i></div>
+  <div class="bLeg"><span><i style="background:#7fd8ff"></i>Mainstream / wire <b>${rel}</b>${d7.length ? ` · ${Math.round(rel / d7.length * 100)}%` : ''}</span><span><i style="background:#c79b5a"></i>Low reliability <b>${low}</b></span></div>
+  ${mk && mk.q ? `${sec('MARKETS', esc(mk.src || ''))}<table class="bMk"><tbody>${mk.q.map(q => `<tr><td>${esc(q.name)}</td><td>${spark(q.series, q.ch >= 0 ? '#3ccf7e' : '#ff6b4a')}</td><td>${fmtP(+q.last)}</td><td class="${q.ch >= 0 ? 'up' : 'dn'}">${q.ch >= 0 ? '+' : '−'}${Math.abs(+q.ch).toFixed(2)}%</td></tr>`).join('')}</tbody></table>` : ''}
+  ${sec('ALL THEATRES · ESCALATION 24H')}
+  ${th.map(t => `<div class="bRow bTh${t.id === S.tid ? ' cur' : ''}"><span>${esc(t.name)}</span><div class="bLine"><i style="width:${t.esc24}%;background:${lvC(t.esc24)}"></i></div><em><b style="color:${lvC(t.esc24)}">${t.esc24}</b> · ${t.n24}</em></div>`).join('')}
+  <p class="bNote">Fixed rules over reported events, the same as the top bar. Coverage tone is a word-list score of headlines, not a measure of the conflict. Figures are counts of clustered reports, not verified events. <a href="#" id="gSent">How sentiment works</a></p>`; }
 function openGauges() { if (document.body.classList.contains('cine')) return; renderGauges(); const g = $('#gauges'); g.style.transform = ''; g.classList.add('open'); g.setAttribute('aria-hidden', 'false'); $('#gScrim').classList.add('on'); }
 function closeGauges() { const g = $('#gauges'); g.style.transform = ''; g.classList.remove('open'); g.setAttribute('aria-hidden', 'true'); $('#gScrim').classList.remove('on'); }
 $('#gX').addEventListener('click', closeGauges); $('#gScrim').addEventListener('click', closeGauges);
