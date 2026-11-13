@@ -416,8 +416,8 @@ function evPos(e) {
   const c = S.th.focus; return { p: ground(c[0], c[1]), where: null, unk: true };
 }
 const cap = s => s.replace(/\b\w/g, c => c.toUpperCase()).replace(/\b(Uk|Raf|Uae|Us|Npp|Idf)\b/g, w => w.toUpperCase());
-function callout(e, P) {
-  const [nm, , col] = TY[e.type];
+function callout(e, P, tag) {
+  const [nm0, , col] = TY[e.type]; const nm = tag || nm0;
   const where = P.off ? `<span class="off">↗ ${esc(cap(P.where))} (off-map)</span>` : P.unk ? 'location not stated' : esc(cap(P.where)) + (P.approx ? ' (country-level)' : '');
   const L = addLabel(`<b class="tg" style="color:${col}">${nm}</b>${esc(e.title.length > 90 ? e.title.slice(0, 88) + '…' : e.title)}<small>${esc(e.outlet)} · ${where}</small>`, 'co', P.p.clone().setY(P.p.y + .35), 10, { ay: 1, force: true });
   const kill = () => { if (L.dead) return; L.op = 0; setTimeout(() => { L.dead = true; L.el.remove(); labels = labels.filter(x => x !== L); }, 450); };
@@ -427,9 +427,14 @@ function play(e, { fly = true } = {}) {
   if (!S.th) return;
   const P = evPos(e), to = P.p; const sides = S.th.sides; const sc = e.actor === 'A' ? sides[0].color : e.actor === 'B' ? sides[1].color : '#ffb35c';
   const col = new THREE.Color(sc).getHex();
+  let from = e.actor ? originFor(e.actor, to) : null;
+  const sl = strikeLike(e);
+  if ((CINE_T.has(e.type) || sl) && S.mode !== 'scrub' && !SC.on && !document.body.classList.contains('cine')) { // v12: cinematic, type-matched
+    if (fly) liveCam(to, e.type === 'blast' || sl ? null : from);
+    callout(e, P, sl ? 'Reported strike' : null); ticker(e); liveStrike(e, to, from, sl); dropPin(e, P); return;
+  }
   if (fly) flyTo(to);
   callout(e, P); ticker(e);
-  let from = e.actor ? originFor(e.actor, to) : null;
   const sky = to.clone().add(new THREE.Vector3(-2.2, 3.2, -1.5));
   switch (e.type) {
     case 'missile': { const n = Math.max(1, e.sev - 1); for (let i = 0; i < n; i++) { const tgt = to.clone().add(new THREE.Vector3((Math.random() - .5) * .3 * i, 0, (Math.random() - .5) * .3 * i)); tgt.y = hAt(tgt.x, tgt.z);
@@ -537,10 +542,11 @@ function buildQueue() {
 }
 function tick(now) {
   if (S.mode === 'scrub') { if (S.playing) { const step = (now - (S.lastT || now)) / 1000 * 3600 * (S.speed === 1 ? 1.5 : 6); const T0 = S.T; S.T = Math.min(Date.now() / 1000, S.T + step); for (const e of S.clusters.map(c => c.lead)) if (e.ts > T0 && e.ts <= S.T) play(e); scrubUI(); if (S.T >= Date.now() / 1000 - 60) togglePlay(false); } S.lastT = now; return; }
-  if (S.live && S.live.length) { if (now > S.nextAt) { setMode('live'); const e = S.live.shift(); if (isMajor(e) && !BRK_SEEN.has(e.id) && Date.now() / 1000 - e.ts < 6 * 3600) { breaking(e); S.nextAt = now + 9000; } else { play(e); S.nextAt = now + 5200; } } return; }
+  if (S.brkQ && S.brkQ.length) { if (document.getElementById('intro') || $('#brk').className || SC.on) return; if (now > S.nextAt) { const e = S.brkQ.shift(); if (!BRK_SEEN.has(e.id)) { breaking(e); S.nextAt = now + 9000; } } return; }
+  if (S.live && S.live.length) { if (now > S.nextAt) { setMode('live'); const e = S.live.shift(); if (isMajor(e) && !BRK_SEEN.has(e.id) && Date.now() / 1000 - e.ts < 6 * 3600) { breaking(e); S.nextAt = now + 9000; } else { play(e); S.nextAt = now + (cineOf(e) ? 8200 : 5200); } } return; }
   if (S.mode === 'live' && now > S.nextAt) setMode('loop');
   if (S.once && S.qi >= S.queue.length) { if (S.queue.length && !S.doneAt) { S.doneAt = 1; markVisit(); if (S.since) { S.since = false; setMode('loop'); } } return; }
-  if (S.queue.length && now > S.nextAt) { const e = S.queue[S.qi % S.queue.length]; S.qi++; play(e); S.nextAt = now + (KIN.has(e.type) ? 4600 : 3600); if (S.qi % S.queue.length === 0) S.nextAt += 2500; }
+  if (S.queue.length && now > S.nextAt) { const e = S.queue[S.qi % S.queue.length]; S.qi++; play(e); S.nextAt = now + (cineOf(e) ? 8200 : KIN.has(e.type) ? 4600 : 3600); if (S.qi % S.queue.length === 0) S.nextAt += 2500; }
   if (!S.queue.length && now > S.nextAt) { $('#ticker').innerHTML = '<div class="tx"><span class="tt">No reports in the last 7 days for this theatre.</span></div>'; S.nextAt = now + 1e9; }
 }
 
@@ -722,6 +728,19 @@ async function pushSync(force, test) {
   const s = sub.toJSON(); const sig = JSON.stringify([s.endpoint, P.th, P.esc]); if (!force && sig === P.sig && Date.now() - P.synced < 86400000) return;
   await post({ id: DEV, sub: { endpoint: s.endpoint, keys: s.keys }, th: P.th, esc: P.esc, v: 4, test: !!test }); P.sig = sig; P.synced = Date.now(); saveP(); renderOpts();
 }
+// v12: one-time "Turn on alerts" card in the installed app when notification permission has never been asked
+// (a re-added home-screen icon is a fresh install: its old push subscription is revoked and alerts start off)
+function alertBanner() {
+  const inst = matchMedia('(display-mode: standalone)').matches || matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+  if (!inst || !pushOK() || Notification.permission !== 'default' || P.on || localStorage.getItem('fl_ab') || $('#alertBan')) return;
+  if (document.getElementById('intro') || document.body.classList.contains('cine') || $('#brk').className) { setTimeout(alertBanner, 4000); return; }
+  const b = document.createElement('div'); b.id = 'alertBan'; b.setAttribute('role', 'dialog'); b.setAttribute('aria-label', 'Turn on alerts');
+  b.innerHTML = '<div class="ab-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div><div class="ab-t"><b>Turn on alerts</b><span>Get notified about major strikes and big escalations. Max 4 an hour, quiet overnight.</span></div><div class="ab-b"><button class="ab-on">Turn on</button><button class="ab-x">Not now</button></div>';
+  document.body.appendChild(b); requestAnimationFrame(() => requestAnimationFrame(() => b.classList.add('in')));
+  const close = () => { localStorage.setItem('fl_ab', '1'); b.classList.remove('in'); setTimeout(() => b.remove(), 450); };
+  b.querySelector('.ab-on').addEventListener('click', () => { close(); pushOn(); });
+  b.querySelector('.ab-x').addEventListener('click', close);
+}
 function toast(m) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(() => t.remove(), 5200); }
 async function pushOn() { if (!pushOK()) { toast('This browser doesn’t support push notifications.'); return; } try { const perm = await Notification.requestPermission(); if (perm !== 'granted') { renderOpts(); return; } P.on = true; saveP(); await pushSync(true, true); toast('Alerts on. A confirmation push arrives with the next refresh (within ~15 min).'); } catch (e) { P.on = false; saveP(); toast('Could not turn on alerts: ' + (e.message || e)); } renderOpts(); }
 async function pushOff() { try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); await post({ id: DEV, off: true }); sub && await sub.unsubscribe(); } catch (_) { } P.on = false; P.sig = ''; saveP(); renderOpts(); }
@@ -772,7 +791,7 @@ function breaking(e, force) {
     <div class="bk-sev">${[1, 2, 3, 4, 5].map(i => `<i class="${i <= e.sev ? 'on' : ''}" style="animation-delay:${.9 + i * .08}s"></i>`).join('')}<span>SEVERITY ${e.sev}/5</span></div></div>
    <div class="bk-foot">Symbolic visual of a reported event · tap to skip</div>`;
   el.className = 'on'; vib([30, 40, 30]);
-  let done = false; const end = () => { if (done) return; done = true; el.className = 'on out'; setTimeout(() => { el.className = ''; el.innerHTML = ''; }, 700); S.userAt = -1e9; go(0); setTimeout(() => { play(e); S.nextAt = performance.now() + 6500; }, 350); };
+  let done = false; const end = () => { if (done) return; done = true; el.className = 'on out'; setTimeout(() => { el.className = ''; el.innerHTML = ''; }, 700); S.userAt = -1e9; go(0); setTimeout(() => { play(e); S.nextAt = performance.now() + 8500; }, 350); };
   el.onclick = end; setTimeout(end, RMQ.matches ? 1800 : 5200);
 }
 
@@ -825,7 +844,7 @@ function scFallout(lat, lon, deg, km) { const p = ground(lat, lon); const L = sc
   const Lb = addLabel(`☢ Fallout plume <em>illustrative · wind-dependent</em>`, 'scL', new THREE.Vector3(p.x + Math.cos(a) * L * .8, p.y + .1, p.z - Math.sin(a) * L * .8), 5, { ay: .5 }); SC.labs.push(Lb); }
 // ---- v10 scenario engine: modelled delivery vehicles, distinct impacts and persistent aftermath (all HYPOTHETICAL)
 scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x2a2018, 1.4)); { const dl = new THREE.DirectionalLight(0xffffff, 2.2); dl.position.set(-4, 8, 3); scene.add(dl); }
-const SCA = o => { world.add(o); SC.objs.push(o); return o; };
+const SCA = o => { world.add(o); SC.objs.push(o); o.userData.t0 = performance.now(); o.userData.live = !SC.on; return o; };
 const scAlive = o => SC.objs.includes(o);
 function scLoop(o, fn) { const st = performance.now(); fx.push(now => { if (!scAlive(o)) return false; return fn((now - st) / 1000, now) !== false; }); }
 const PBR = (c, r = .55, m = .35) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
@@ -973,6 +992,51 @@ function drones(o, tps, { n = 6, delay = 0 } = {}) { let last = 0;
   return last; }
 function fleet(o, tps, { n = 2, delay = 0, kind = 'warship' } = {}) { let last = 0; tps.forEach((p, i) => { for (let j = 0; j < n; j++) { const s0 = o.clone().add(new THREE.Vector3(j * .3, 0, j * .22)); s0.y = 0; const e = p.clone().add(new THREE.Vector3(j * .22, 0, -j * .18)); e.y = 0; const d0 = delay + i * 400 + j * 300; last = Math.max(last, d0 + 4800);
   const sh = shipMesh(kind, .24); fly(sh, lerpV(s0, e), 4800, { delay: d0, keep: true }); scLoop(sh, (t, now) => { if (!sh.visible || Math.random() > .3) return; const w = add(sprite(SMOKE, new THREE.Color(0xe8f4ff), .03, false)); w.position.copy(sh.position); fade(w, w.material, 1400, u => { w.scale.setScalar(.03 + u * .06); w.material.opacity = (1 - u) * .5; }); }); } }); return last; }
+// ---- v12 live cinematic: real reports drawn with the scenario engine, matched to the reported type. Symbolic visual of a
+// reported event: no weapon is drawn unless the report's type names one; nothing here is a forecast or a scenario.
+const CINE_T = new Set(['air', 'missile', 'drone', 'naval', 'ground', 'blast']);
+const FAC_RX = /\b(bases?|air ?bases?|airfields?|airports?|radars?|early[- ]warning|facilit(y|ies)|sites?|depots?|refiner(y|ies)|plants?|ports?|headquarters|hq|barracks|installations?|compounds?|command (post|centre|center)|launchers?|batter(y|ies)|air defen[cs]es?|embass(y|ies)|camps?|bridges?|power station|substations?|terminals?)\b/i;
+const STRUCK_RX = /\b(destroy(s|ed)?|targets|targeted|struck|strikes|hit|hits|attack(s|ed)|bomb(s|ed)|shell(s|ed)|pound(s|ed)|damag(es|ed)|knock(s|ed) out|flatten(s|ed)|level(s|led|ed))\b/i;
+const HYPO_RX = /\b(would|could|may|might|threat(en|ens|ened)?|vows?|warns?|if|plans?|planning|consider\w*|ready to|will|should|denies|denied|false|fake|no evidence)\b|\?/i;
+// a report typed threat/statement whose headline says a named facility was hit (e.g. "IRGC destroys U.S. radar in Bahrain"): drawn as an impact, never as a weapon
+const strikeLike = e => (e.type === 'threat' || e.type === 'statement') && !e.lowrel && STRUCK_RX.test(e.title || '') && FAC_RX.test(e.title || '') && !HYPO_RX.test(e.title || '');
+const cineOf = e => (CINE_T.has(e.type) || strikeLike(e)) && S.mode !== 'scrub' && !SC.on;
+const gnd = p => { const q = p.clone(); q.y = Math.max(hAt(q.x, q.z), 0); return q; };
+function liveCam(to, from) { // close, tilted framing of launch side + target; respects a user who is handling the map
+  const base = innerWidth / innerHeight < 1 ? 5 : 4.2; let tg = to, d = base;
+  if (from) { const L = Math.min(6, from.distanceTo(to)); tg = to.clone().lerp(from, Math.min(.25, L / 24)); d = base + L * .2; }
+  flyTo(tg, d); if (performance.now() - S.userAt < 15000) return; camGoal.polar = 1.0; camGoal.az = null;
+  clearTimeout(S.camT); S.camT = setTimeout(() => { if (!SC.on) camGoal.polar = null; }, 9000); }
+function facilityHit(p, sev) { // struck base / radar / depot: blast, shockwave, crater, rubble, fires, secondary blasts, smoke column
+  if (SC.on) return; const sea = hAt(p.x, p.z) <= .001; if (sea) { waterSpout(p, 1); return; }
+  boom(p, Math.min(5, sev + 1), 0xff7a2a); lightFlash(p, 1 + sev * .2); groundHit(p, sev + 1, 0xff6a20, 3600); shake = Math.max(shake, .25 + sev * .06);
+  ringPulse(p, 0xffd8b0, .7 + sev * .14, 1100, 1, 0); dustRing(p, .3 + sev * .07, 2800);
+  decal(p, .12 + sev * .03, CRATER, .9, .5); rubble(p, .08 + sev * .02, 44); fires(p, .1 + sev * .015, 6);
+  smokePlume(p, { h: 1.1 + sev * .15, w: .1 + sev * .01, rate: 6, life: 6, col: 0x171412, glow: .8 });
+  for (let i = 0; i < (Q.low ? 2 : 4); i++) setTimeout(() => { if (SC.on) return; const a = Math.random() * 6.28, r = .04 + Math.random() * (.1 + sev * .02); boom(gnd(p.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r))), 1 + (Math.random() * 2 | 0), 0xffa040); }, 450 + i * 420 + Math.random() * 200); }
+function liveStrike(e, to, from, sl) {
+  const sev = Math.max(2, Math.min(5, e.sev || 3)), tp = gnd(to), fac = FAC_RX.test(e.title || '');
+  const launch = (dmax, fb) => { if (from) { const v = from.clone().sub(tp).setY(0), L = v.length(); if (L > .6) return gnd(tp.clone().addScaledVector(v.normalize(), Math.min(L, dmax))); } return gnd(tp.clone().add(fb)); };
+  let hitAt = 400;
+  if (sl) { /* weapon not stated: impact only */ }
+  else switch (e.type) {
+    case 'air': { const o = launch(6, new THREE.Vector3(-3, 0, 1.5)); scJets(o, [tp], { n: sev >= 4 ? 3 : 2, bombs: true, alt: .8 }); hitAt = 2650; break; }
+    case 'missile': { const o = launch(6.5, new THREE.Vector3(-3.5, 0, -2)); hitAt = Math.max(1200, salvo(o, [tp], { n: Math.min(6, sev + 1) }) - 400); break; }
+    case 'drone': { const o = launch(4.5, new THREE.Vector3(-2.5, 0, -1.2)); hitAt = Math.max(1200, drones(o, [tp], { n: Math.min(6, sev + 1) }) - 300); break; }
+    case 'ground': { const o = launch(1.6, new THREE.Vector3(-1.2, 0, .6)); hitAt = salvo(o, [tp], { n: 4 + sev, rockets: true }); setTimeout(() => { if (!SC.on) dustRing(tp, .25 + sev * .05, 2400); }, 2300); break; }
+    case 'naval': { if (hAt(tp.x, tp.z) > .001) { ships(tp, 0x9fd0ff, sev); return; } // reported off the coast but placed on land: keep the light visual
+      const kind = /tanker|merchant|cargo|commercial|vessel|ship(?!s? of the line)/i.test(e.title || '') && !/warship|destroyer|frigate|carrier|navy/i.test(e.title || '') ? 'tanker' : 'warship';
+      const a = tp.clone().add(new THREE.Vector3(-.7, 0, .35)), b = tp.clone().add(new THREE.Vector3(.35, 0, -.18)); a.y = b.y = 0; const sh = shipMesh(kind, .24); fly(sh, lerpV(a, b), 6500, { keep: true });
+      scLoop(sh, () => { if (!sh.visible || Math.random() > .3) return; const w = add(sprite(SMOKE, new THREE.Color(0xe8f4ff), .03, false)); w.position.copy(sh.position); fade(w, w.material, 1400, u => { w.scale.setScalar(.03 + u * .06); w.material.opacity = (1 - u) * .5; }); });
+      if (sev >= 3) setTimeout(() => { if (SC.on) return; const q = sh.position.clone(); q.y = .05; boom(q, sev - 1, 0xff8a3a); waterSpout(q, .5); smokePlume(q, { h: .9, w: .08, rate: 5, life: 5, col: 0x1a1715, glow: .7 }); }, 2600);
+      return; }
+    case 'blast': hitAt = 300; break; // attacker not stated: no launch path drawn
+  }
+  if (fac || sl || e.type === 'blast') setTimeout(() => (fac || sl) ? facilityHit(tp, sev) : impact(tp, Math.max(2, sev - 1)), hitAt);
+}
+// live objects made by the engine are cleared ~14 s after they appear (scenario objects are cleared by endScen)
+setInterval(() => { if (SC.on) return; const t = performance.now(), dead = SC.objs.filter(o => o.userData.live && t - o.userData.t0 > 14000); if (!dead.length) return;
+  dead.forEach(o => { world.remove(o); o.material?.dispose?.(); }); SC.objs = SC.objs.filter(o => !dead.includes(o)); }, 2000);
 // illustrative retaliation branches: who answers, from where, at what (labelled HYPOTHETICAL; not a report or a forecast)
 const RET = {
   'ir-pickaxe-nuke': { who: 'Iran', mode: 'missiles', from: [33.2, 48.6], to: [[25.117, 51.315, 'Al Udeid'], [26.21, 50.6, 'NSA Bahrain'], [24.248, 54.548, 'Al Dhafra']], n: 9, intercept: true },
@@ -1255,8 +1319,9 @@ function openQueue() {
   const lv = lastVisit(S.tid); const leads = S.clusters.map(c => c.lead).sort((a, b) => a.ts - b.ts);
   const fresh = lv ? leads.filter(e => e.ts > lv) : []; S.firstVisit = !lv;
   S.once = true; S.qi = 0; S.doneAt = 0; S.loopH = 24;
-  if (fresh.length) { S.queue = fresh.slice(-24); S.since = true; }
-  else { S.queue = leads.length ? [leads[leads.length - 1]] : []; S.since = false; }
+  const now = Date.now() / 1000; S.brkQ = leads.filter(e => isMajor(e) && now - e.ts < 12 * 3600 && !BRK_SEEN.has(e.id)).slice(-4); const mj = new Set(S.brkQ.map(e => e.id));
+  if (fresh.length) { const q = fresh.filter(e => !mj.has(e.id)); S.queue = (q.length ? q : fresh).slice(-24); S.qi = q.length ? 0 : S.queue.length; S.since = true; }
+  else { const L = leads[leads.length - 1]; S.queue = L ? [L] : []; S.since = false; if (L && mj.has(L.id)) S.qi = 1; }
 }
 function idleQueue() { const leads = S.clusters.map(c => c.lead).sort((a, b) => a.ts - b.ts); S.queue = leads.length ? [leads[leads.length - 1]] : []; S.qi = S.queue.length; S.once = true; S.since = false; S.doneAt = 1; }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') markVisit(); });
@@ -1535,7 +1600,7 @@ async function init() {
   const h = (location.hash.match(/t=([\w-]+)/) || [])[1];
   await loadTheatre(h || localStorage.getItem('fl_t') || 'us-iran');
   go(DESK.matches ? 1 : 0); if (DESK.matches) { dockI = 0; bs.set(slotX(0)); }
-  applyLayers(); renderOpts(); pushSync(false).catch(() => { });
+  applyLayers(); renderOpts(); pushSync(false).catch(() => { }); setTimeout(alertBanner, 5000);
   await Promise.race([pollFast(), new Promise(r => setTimeout(r, 2500))]);
   const hs = decodeURIComponent((location.hash.match(/s=([^&]+)/) || [])[1] || ''); if (hs) { const e = S.events.find(x => x.id === hs); if (e) { history.replaceState(null, '', location.pathname + location.search + '#t=' + S.tid); openStory(e); } }
   const he = (location.hash.match(/e=([\w-]+)/) || [])[1]; if (he) { const e = S.events.find(x => x.id === he); if (e) setTimeout(() => breaking(e, true), 600); }

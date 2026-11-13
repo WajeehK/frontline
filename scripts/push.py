@@ -104,6 +104,22 @@ def main():
             return False
         except Exception as e:
             print('push: send error', type(e).__name__, file=sys.stderr); return False
+    def morning(did, d):  # first run after quiet hours (07:30 UK): one summary of the severity-3+ strikes held overnight
+        held = [h for h in d.get('held', []) if now - h['ts'] < 12 * 3600 and h['tid'] in d['th']]
+        if len(d['log']) >= MAX_PER_HOUR: return  # keep them for the next run
+        d['held'] = []
+        uniq = []
+        for h in sorted(held, key=lambda h: (-h['sev'], -h['ts'])):
+            tk = toks(h['title'])
+            if any(len(tk & set(p)) / max(1, len(tk | set(p))) >= 0.4 for p in d['tok'] + [u['tk'] for u in uniq]): continue  # same incident / already pushed
+            h['tk'] = sorted(tk); uniq.append(h)
+        if not uniq: return
+        uniq.sort(key=lambda h: h['ts']); n = len(uniq); ths = sorted({h['tid'] for h in uniq})
+        lines = [f"{ICON.get(h['type'], '•')} {datetime.fromtimestamp(h['ts'], LON).strftime('%H:%M')} {h['title']} — {h['outlet']}" for h in uniq[-3:]]
+        if n > 3: lines.insert(0, f"+{n - 3} earlier")
+        title = f"🌅 Overnight: {n} strike report{'s' if n > 1 else ''} · {', '.join(TH[t]['name'] for t in ths)}"
+        if send(did, d, {'title': title, 'body': '\n'.join(lines), 'tag': 'fl-morning', 'url': f"./#t={ths[0]}" if len(ths) == 1 else './'}):
+            d['log'].append(now); d['tok'].extend(h['tk'] for h in uniq)
     # escalation band rises (computed once per run, then fanned out)
     rises = {}
     for tid, ix in IX.items():
@@ -116,6 +132,7 @@ def main():
             send(did, d, {'title': '🔔 Frontline alerts are on', 'body': f'Major strikes, missile launches and big escalations for: {names}. Max {MAX_PER_HOUR} an hour; quiet 00:30–07:30 unless severe.', 'tag': 'fl-welcome', 'url': './'})
             continue
         d['log'] = [t for t in d['log'] if now - t < 3600]
+        if not quiet and d.get('held'): morning(did, d)
         cands = []
         for tid in d['th']:
             for c in CL.get(tid, []):
@@ -124,7 +141,11 @@ def main():
                 if c['type'] in KIN and c['sev'] >= 3 and not c.get('lowrel'): cands.append((c['sev'], tid, c))
         cands.sort(key=lambda x: (-x[0], -x[2]['ts']))
         for sev, tid, c in cands:
-            if quiet and sev < 5: continue
+            if quiet and sev < 5:  # held for the 07:30 morning summary instead of being dropped once >4h old
+                d['sent'].append(c['cid'])
+                d.setdefault('held', []).append({'cid': c['cid'], 'tid': tid, 'type': c['type'], 'sev': sev, 'title': c['title'][:200], 'outlet': c.get('outlet', '')[:60], 'ts': c['ts']})
+                d['held'] = d['held'][-40:]
+                continue
             if len(d['log']) >= MAX_PER_HOUR: break
             d['sent'].append(c['cid'])
             tk = toks(c['title'])
