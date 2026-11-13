@@ -248,6 +248,21 @@ def classify(title, desc, outlet=None):
     if low_rel(outlet) and typ in KINETIC | {"mine", "naval"}: return ("threat", 1) if SPEECH_VETO.search(tl) else ("statement", 1)
     return typ, sev
 
+# ---- v12: a claimed completed strike on a named place ("IRGC destroys U.S. radar in Bahrain", "Iran says it targeted US radar site in Bahrain")
+# is a strike, not a threat. The weapon is only set when the report names one; otherwise it is an unattributed-weapon INCIDENT (blast).
+CLAIM_HIT = re.compile(r"\b(destroy(s|ed)|targeted|targets|struck|hit|hits|attacked|attacks|bombed|knock(s|ed) out|blew up|blows up|shell(s|ed)|pound(s|ed)|downed|shot down)\b", re.I)
+CLAIM_VETO = re.compile(r"\b(denies|denied|deny|false|fake|rumou?rs?|no evidence|hoax|debunk\w*)\b|\blive:|\blive updates\b|\bover (the (past|last) )?[\d,]+ (years?|months?|weeks?)\b|\bsince \d{4}\b|\bhits? (a |an )?(\S+ )?(high|low|record|peak|milestone)\b", re.I)
+WEAPON = [("missile", re.compile(r"\b(missiles?|ballistic|rockets?|cruise)\b", re.I)), ("drone", re.compile(r"\b(drones?|uavs?|shaheds?|kamikaze)\b", re.I)),
+          ("air", re.compile(r"\b(air ?strikes?|airstrikes?|warplanes?|fighter jets?|jets|bombers?|air raids?|aircraft)\b", re.I))]
+def claimed_strike(typ, title, loc):
+    t = title.strip()
+    return (typ in ("threat", "statement") and loc and loc.get("kind") in ("place", "sea", "metro") and CLAIM_HIT.search(t)
+            and not SPEECH_VETO.search(t) and not CLAIM_VETO.search(t) and not OPINION.search(t) and not LEGAL.search(t) and t[:1] not in "'\"‘“")
+def claimed_type(title, desc, sev):
+    text = title + " " + (desc or "")[:300]
+    w = next((k for k, rx in WEAPON if rx.search(text)), None)
+    return (w, max(3, sev)) if w else ("blast", max(3, sev))
+
 UNKNOWN_REGION = re.compile(r"\b([A-Z][a-z]+(?:-[A-Z][a-z]+)?) (Oblast|region|province|governorate|district)\b")
 def geocode(tid, title, desc, kinetic=True):
     w, s, e, n = T[tid]['bbox']
@@ -344,6 +359,10 @@ def summ(m):
         if o and d.lower().endswith(o.lower()): d = d[:-len(o)].strip(" -–—:|·")
     return d[:280] if len(d) > 25 else ''
 
+STRIKE_SET = KINETIC | {"blast"}
+def strikeish(e): return not CLAIM_VETO.search(e['title']) and (e['type'] in STRIKE_SET or (e['type'] in ('threat', 'statement') and CLAIM_HIT.search(e['title']) and not SPEECH_VETO.search(e['title'])))
+MERGE_BROAD = {'gaza', 'gaza strip', 'gaza city', 'west bank', 'lebanon', 'south lebanon', 'southern lebanon', 'donbas', 'donetsk', 'kashmir', 'jammu and kashmir', 'azad kashmir', 'yemen', 'iran', 'israel', 'ukraine', 'russia', 'taiwan'}
+MERGE_GENERIC = toks('strike strikes struck attack attacks attacked hit hits killed kill kills killing targeted targets destroys destroyed destroy says claims military forces army troops idf iran iranian israel israeli russia russian ukraine ukrainian us u.s american americans houthi houthis hezbollah hamas pakistan pakistani india indian china chinese taiwan korea korean north south people dead wounded injured report reports reported official officials attacks bombed missile missiles drone drones')
 def cluster(evs):
     """Group reports of the same incident: within 12h, compatible location, and similar headline."""
     cl = []
@@ -357,6 +376,9 @@ def cluster(evs):
             same_place = la and lb and la['name'] == lb['name']
             kin_pair = (e['type'] in KINETIC) == (c['type'] in KINETIC)
             ok = jac >= 0.34 or (inter >= 3 and same_place and kin_pair) or (inter >= 4 and kin_pair)
+            if (not ok and same_place and la['kind'] == 'place' and la['name'] not in MERGE_BROAD and min(abs(m['ts'] - e['ts']) for m in c['_m']) < 21600
+                    and strikeish(e) and any(strikeish(m) for m in c['_m']) and not (e.get('actor') and c.get('actor') and e['actor'] != c['actor'])):
+                ok = len((tk & c['_tk']) - MERGE_GENERIC - toks(la['name'])) >= 2  # same incident retold (e.g. a strike + a weaker 'threat' copy)
             if ok and (best is None or jac > best[0]): best = (jac, c)
         if best: c = best[1]; c['_m'].append(e); c['_tk'] |= tk
         else: c = {'ts': e['ts'], 'loc': e['loc'], 'type': e['type'], '_m': [e], '_tk': set(tk)}; cl.append(c)
@@ -431,6 +453,7 @@ def make_event(tid, it):
     typ, sev = classify(title, it.get('desc', ''), it.get('outlet'))
     if not typ: return eid, None
     loc = geocode(tid, title, it.get('desc', ''), typ in KINETIC)
+    if claimed_strike(typ, title, loc): typ, sev = claimed_type(title, it.get('desc', ''), sev)
     act = actor(tid, title); lnc = launcher(tid, title)
     if typ in ("missile", "drone", "air", "ground") and not (act or lnc or (INTERCEPT.search(title) and interceptor(tid, title))):
         typ, sev = ("blast", max(1, sev - 1)) if COMPLETED.search(title) and not NATURAL.search(title) else ("statement", 1)  # completed action but nobody named: shown as an unattributed incident, not a side's strike
