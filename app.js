@@ -888,12 +888,55 @@ function bombMesh(L = .12, c = 0x4a5040) { const g = new THREE.Group(); const m 
   const n = new THREE.Mesh(new THREE.ConeGeometry(L * .12, L * .25, 10), m); n.rotation.x = Math.PI / 2; n.position.z = L * .52; g.add(n);
   for (let i = 0; i < 4; i++) { const f = new THREE.Mesh(new THREE.BoxGeometry(L * .02, L * .22, L * .14), m); f.position.z = -L * .38; f.rotation.z = i * Math.PI / 2; f.position.x = Math.cos(i * Math.PI / 2 + Math.PI / 2) * L * .1; f.position.y = Math.sin(i * Math.PI / 2 + Math.PI / 2) * L * .1; g.add(f); } return g; }
 function missileMesh(L = .16, c = 0xe8e8e0) { const g = bombMesh(L, c); const pl = sprite(GLOW, new THREE.Color(0xffb050), L * .9); pl.position.z = -L * .55; g.add(pl); g.userData.plume = pl; return g; }
-function shipMesh(kind = 'tanker', s = .2) { const g = new THREE.Group(); const hull = kind === 'tanker' ? 0x7a2e24 : 0x5d666f;
-  const H = flatMesh(planform([[0, -1], [.16, -.75], [.17, .85], [.12, 1], [-.12, 1], [-.17, .85], [-.16, -.75]], s), s * .08, PBR(hull, .7, .2)); g.add(H);
-  const dk = new THREE.Mesh(new THREE.BoxGeometry(s * .26, s * .03, s * 1.6), PBR(kind === 'tanker' ? 0x3d5a3a : 0x6f7880, .8, .1)); dk.position.set(0, s * .1, -s * .05); g.add(dk);
-  const sup = new THREE.Mesh(new THREE.BoxGeometry(s * .24, s * .2, s * .22), PBR(0xe8e8e8, .6, .1)); sup.position.set(0, s * .2, kind === 'tanker' ? -s * .75 : s * .1); g.add(sup);
-  if (kind !== 'tanker') { const gun = new THREE.Mesh(new THREE.CylinderGeometry(s * .05, s * .06, s * .06, 8), PBR(0x6f7880)); gun.position.set(0, s * .14, s * .6); g.add(gun); }
-  return g; }
+function shipMesh(kind = 'tanker', s = .2) {
+  const g = new THREE.Group();
+  const tanker = kind === 'tanker';
+  const hullC = tanker ? 0x6a2c26 : 0x4a545c, bootC = tanker ? 0x1c0e0c : 0x1a1c1e;
+  const deckC = tanker ? 0x3a4a38 : 0x5a6368, houseC = tanker ? 0xe8e4da : 0xc8ccd0;
+  const pipeC = 0xc8cbd0, darkC = 0x2a2c2e;
+  // planform: bow at +y, becomes -Z after extrude+rotateX (matches Object3D.lookAt)
+  const pts = tanker
+    ? [[0, 1.24], [.06, 1.14], [.14, .92], [.19, .5], [.2, -.15], [.19, -.88], [.13, -1.14], [.07, -1.22], [-.07, -1.22], [-.13, -1.14], [-.19, -.88], [-.2, -.15], [-.19, .5], [-.14, .92], [-.06, 1.14]]
+    : [[0, 1.16], [.08, 1.04], [.17, .7], [.18, .1], [.17, -.72], [.12, -1.06], [.06, -1.14], [-.06, -1.14], [-.12, -1.06], [-.17, -.72], [-.18, .1], [-.17, .7], [-.08, 1.04]];
+  const sh = new THREE.Shape(); pts.forEach(([x, y], i) => i ? sh.lineTo(x * s, y * s) : sh.moveTo(x * s, y * s)); sh.closePath();
+  const hullH = s * (tanker ? .22 : .16);
+  const hg = new THREE.ExtrudeGeometry(sh, { depth: hullH, bevelEnabled: true, bevelThickness: s * .03, bevelSize: s * .022, bevelSegments: 3 });
+  hg.rotateX(-Math.PI / 2);
+  const hull = new THREE.Mesh(hg, PBR(hullC, .72, .12)); g.add(hull);
+  const stripe = new THREE.Shape(); pts.forEach(([x, y], i) => i ? stripe.lineTo(x * s * 1.03, y * s * 1.01) : stripe.moveTo(x * s * 1.03, y * s * 1.01)); stripe.closePath();
+  const sg = new THREE.ExtrudeGeometry(stripe, { depth: s * .028, bevelEnabled: false }); sg.rotateX(-Math.PI / 2);
+  const band = new THREE.Mesh(sg, PBR(bootC, .88, .05)); band.position.y = hullH * .32; g.add(band);
+  const dsh = new THREE.Shape(); pts.forEach(([x, y], i) => i ? dsh.lineTo(x * s * .86, y * s * .9) : dsh.moveTo(x * s * .86, y * s * .9)); dsh.closePath();
+  const dg = new THREE.ExtrudeGeometry(dsh, { depth: s * .022, bevelEnabled: false }); dg.rotateX(-Math.PI / 2);
+  const deck = new THREE.Mesh(dg, PBR(deckC, .85, .08)); deck.position.y = hullH * .9; g.add(deck);
+  if (tanker) {
+    const rack = new THREE.Mesh(new THREE.BoxGeometry(s * .13, s * .016, s * 1.2), PBR(0x4a5248, .7, .2)); rack.position.set(0, hullH + s * .03, -s * .18); g.add(rack);
+    for (const x of [-s * .038, s * .038]) {
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(s * .013, s * .013, s * 1.16, 8), PBR(pipeC, .35, .75));
+      pipe.rotation.x = Math.PI / 2; pipe.position.set(x, hullH + s * .048, -s * .18); g.add(pipe);
+    }
+    for (let i = 0; i < 9; i++) {
+      const z = -s * .72 + i * (s * .14);
+      const v = new THREE.Mesh(new THREE.CylinderGeometry(s * .02, s * .02, s * .055, 8), PBR(0xb8a060, .45, .4));
+      v.position.set(0, hullH + s * .065, z); g.add(v);
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(s * .016, 8, 6), PBR(0x8a7a50, .4, .5)); cap.position.set(0, hullH + s * .095, z); g.add(cap);
+    }
+    const walk = new THREE.Mesh(new THREE.BoxGeometry(s * .048, s * .008, s * 1.18), PBR(0x8a9088, .6, .2)); walk.position.set(s * .09, hullH + s * .045, -s * .18); g.add(walk);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(s * .012, s * .014, s * .18, 8), PBR(darkC, .5, .3)); post.position.set(0, hullH + s * .13, -s * .08); g.add(post);
+    const boom = new THREE.Mesh(new THREE.BoxGeometry(s * .014, s * .014, s * .32), PBR(0x9aa090, .5, .3)); boom.position.set(0, hullH + s * .22, -s * .18); boom.rotation.x = .45; g.add(boom);
+  }
+  const aftZ = tanker ? s * .82 : s * .12;
+  const d1 = new THREE.Mesh(new THREE.BoxGeometry(s * .3, s * .15, s * .34), PBR(houseC, .55, .08)); d1.position.set(0, hullH + s * .11, aftZ); g.add(d1);
+  const win = new THREE.Mesh(new THREE.BoxGeometry(s * .31, s * .04, s * .26), PBR(0x1a2430, .3, .1)); win.position.set(0, hullH + s * .14, aftZ - s * .02); g.add(win);
+  const br = new THREE.Mesh(new THREE.BoxGeometry(s * .4, s * .1, s * .16), PBR(houseC, .5, .08)); br.position.set(0, hullH + s * .22, aftZ - s * .05); g.add(br);
+  const brw = new THREE.Mesh(new THREE.BoxGeometry(s * .42, s * .032, s * .08), PBR(0x1a2430, .3, .1)); brw.position.set(0, hullH + s * .23, aftZ - s * .07); g.add(brw);
+  const fun = new THREE.Mesh(new THREE.CylinderGeometry(s * .042, s * .055, s * .18, 10), PBR(darkC, .5, .2)); fun.position.set(0, hullH + s * .3, aftZ + s * .13); g.add(fun);
+  const fcap = new THREE.Mesh(new THREE.CylinderGeometry(s * .05, s * .038, s * .03, 10), PBR(0x111111, .4, .2)); fcap.position.set(0, hullH + s * .4, aftZ + s * .13); g.add(fcap);
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(s * .007, s * .01, s * .3, 6), PBR(0x888888, .4, .4)); mast.position.set(0, hullH + s * .4, aftZ - s * .05); g.add(mast);
+  const yard = new THREE.Mesh(new THREE.BoxGeometry(s * .24, s * .006, s * .006), PBR(0xaaaaaa, .4, .4)); yard.position.set(0, hullH + s * .5, aftZ - s * .05); g.add(yard);
+  if (!tanker) { const gun = new THREE.Mesh(new THREE.CylinderGeometry(s * .03, s * .04, s * .16, 8), PBR(0x6f7880)); gun.rotation.x = Math.PI / 2; gun.position.set(0, hullH + s * .07, -s * .7); g.add(gun); }
+  return g;
+}
 // textures for aftermath decals
 const SCORCH = tex((g, n) => { const r = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2); r.addColorStop(0, 'rgba(10,6,4,.95)'); r.addColorStop(.55, 'rgba(25,14,8,.8)'); r.addColorStop(.8, 'rgba(60,35,18,.35)'); r.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = r; g.fillRect(0, 0, n, n);
   for (let i = 0; i < 260; i++) { const a = Math.random() * 6.28, d = Math.random() * n * .45; g.fillStyle = `rgba(${Math.random() < .5 ? '0,0,0' : '70,40,20'},${Math.random() * .35})`; g.beginPath(); g.arc(n / 2 + Math.cos(a) * d, n / 2 + Math.sin(a) * d, Math.random() * n * .03, 0, 7); g.fill(); } }, 256);
@@ -1225,6 +1268,8 @@ async function loadTheatre(tid) {
   if (isGlobe) {
     S.tid = 'globe'; S.th = GLOBE_TH; localStorage.setItem('fl_t', 'globe');
     document.body.classList.add('globe'); document.body.classList.remove('tension');
+    if (S._hudPreGlobe == null) S._hudPreGlobe = document.body.classList.contains('hudc');
+    setHud(true, false);
     $('#thName').textContent = 'Globe'; $('#thName').dataset.k = ''; $('#sideA').textContent = 'WORLD'; $('#sideB').textContent = '';
     clearWorld(); await buildGlobe();
     const ids = Object.keys(S.TH);
@@ -1238,6 +1283,7 @@ async function loadTheatre(tid) {
     return;
   }
   document.body.classList.remove('globe'); restoreTheatreControls();
+  if (S._hudPreGlobe === false) setHud(false, false); S._hudPreGlobe = null;
   S.tid = tid; S.th = S.TH[tid]; localStorage.setItem('fl_t', tid);
   $('#thName').textContent = S.th.name; document.body.classList.toggle('tension', S.th.kind === 'tension'); $('#thName').dataset.k = S.th.kind === 'tension' ? 'TENSIONS' : ''; $('#sideA').textContent = S.th.sides[0].short; $('#sideB').textContent = S.th.sides[1].short;
   document.documentElement.style.setProperty('--A', S.th.sides[0].color); document.documentElement.style.setProperty('--B', S.th.sides[1].color);
@@ -1638,7 +1684,12 @@ function frame(now) {
     controls.target.lerp(camGoal.target, k);
     const d = off.length(); const nd = d + (camGoal.dist - d) * k * .6; off.setLength(nd);
     if (camGoal.polar != null) { const sp = new THREE.Spherical().setFromVector3(off); sp.phi += (camGoal.polar - sp.phi) * k; if (camGoal.az != null) { let da = camGoal.az - sp.theta; da = Math.atan2(Math.sin(da), Math.cos(da)); sp.theta += da * k; } off.setFromSpherical(sp); }
-    else if (!RMQ.matches) off.applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * .02);
+    else if (!RMQ.matches && !GLOBE.on) off.applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * .02);
+    camera.position.copy(controls.target).add(off);
+  }
+  if (GLOBE.on && !RMQ.matches && !CINE.on && (now - S.userAt > 700)) {
+    const off = camera.position.clone().sub(controls.target);
+    off.applyAxisAngle(new THREE.Vector3(0, 1, 0), dt * .08);
     camera.position.copy(controls.target).add(off);
   }
   controls.update();
@@ -1668,8 +1719,13 @@ function llVec(lat, lon, r = 1) {
   const phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180;
   return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th));
 }
+function globeFitDist() {
+  const aspect = Math.max(.2, camera.aspect || (innerWidth / innerHeight));
+  const vFov = (camera.fov * Math.PI) / 180, hFov = 2 * Math.atan(Math.tan(vFov / 2) * aspect);
+  return 1.2 / Math.sin(Math.min(vFov, hFov) / 2) * 1.08;
+}
 function setGlobeControls() {
-  controls.enablePan = false; controls.minDistance = 1.55; controls.maxDistance = 4.6;
+  controls.enablePan = false; controls.minDistance = 3.8; controls.maxDistance = 12;
   controls.minPolarAngle = 0.12; controls.maxPolarAngle = Math.PI - 0.12;
   controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
   controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
@@ -1683,7 +1739,7 @@ function restoreTheatreControls() {
 function disposeGlobe() {
   GLOBE.on = false; GLOBE.hot = []; GLOBE.marks = [];
   if (GLOBE.stars) { scene.remove(GLOBE.stars); GLOBE.stars.geometry.dispose(); GLOBE.stars.material.dispose(); GLOBE.stars = null; }
-  if (GLOBE.root) { scene.remove(GLOBE.root); GLOBE.root.traverse(o => { o.geometry?.dispose?.(); if (o.material) { const ms = [].concat(o.material); ms.forEach(m => { m.map?.dispose?.(); m.dispose?.(); }); } }); GLOBE.root = null; GLOBE.earth = null; }
+  if (GLOBE.root) { scene.remove(GLOBE.root); GLOBE.root.traverse(o => { o.geometry?.dispose?.(); if (o.material) { const ms = [].concat(o.material); ms.forEach(m => { if (m.map && m.map !== GLOBE.tex) m.map.dispose?.(); m.dispose?.(); }); } }); GLOBE.root = null; GLOBE.earth = null; }
   scene.background = new THREE.Color(0x000000);
 }
 async function buildGlobe() {
@@ -1692,20 +1748,25 @@ async function buildGlobe() {
   if (!GLOBE.tex) {
     GLOBE.tex = await new Promise((res, rej) => new THREE.TextureLoader().load('geo/earth.jpg', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); res(t); }, undefined, rej));
   }
+  if (GLOBE.tex) { GLOBE.tex.wrapS = THREE.RepeatWrapping; GLOBE.tex.wrapT = THREE.ClampToEdgeWrapping; GLOBE.tex.needsUpdate = true; }
   const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), new THREE.MeshPhongMaterial({
-    map: GLOBE.tex, emissive: new THREE.Color(0x14301c), emissiveMap: GLOBE.tex, emissiveIntensity: .85,
-    shininess: 6, specular: new THREE.Color(0x0a0a0a)
+    map: GLOBE.tex, color: 0xffffff,
+    emissive: new THREE.Color(0x0c2018), emissiveMap: GLOBE.tex, emissiveIntensity: .5,
+    shininess: 14, specular: new THREE.Color(0x15202a)
   }));
   GLOBE.earth = earth; root.add(earth);
-  const atmo = new THREE.Mesh(new THREE.SphereGeometry(1.035, 64, 48), new THREE.MeshBasicMaterial({ color: 0x3cff9a, transparent: true, opacity: .09, side: THREE.BackSide, depthWrite: false }));
-  root.add(atmo);
-  const atmo2 = new THREE.Mesh(new THREE.SphereGeometry(1.018, 64, 48), new THREE.MeshBasicMaterial({ color: 0x7ec8ff, transparent: true, opacity: .07, depthWrite: false }));
-  root.add(atmo2);
-  // starfield
-  const N = 900, pos = new Float32Array(N * 3);
-  for (let i = 0; i < N; i++) { const r = 12 + Math.random() * 30, p = Math.acos(2 * Math.random() - 1), t = Math.random() * 6.283; pos[i * 3] = r * Math.sin(p) * Math.cos(t); pos[i * 3 + 1] = r * Math.cos(p); pos[i * 3 + 2] = r * Math.sin(p) * Math.sin(t); }
+  const atmoMat = new THREE.ShaderMaterial({
+    uniforms: { color: { value: new THREE.Color(0x7ee8ff) } },
+    vertexShader: 'varying vec3 vN;varying vec3 vV;void main(){vec4 p=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-p.xyz);gl_Position=projectionMatrix*p;}',
+    fragmentShader: 'uniform vec3 color;varying vec3 vN;varying vec3 vV;void main(){float f=pow(1.0-abs(dot(normalize(vN),normalize(vV))),3.1);gl_FragColor=vec4(color,f*1.05);}',
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide
+  });
+  root.add(new THREE.Mesh(new THREE.SphereGeometry(1.085, 64, 48), atmoMat));
+  root.add(new THREE.Mesh(new THREE.SphereGeometry(1.02, 64, 48), new THREE.MeshBasicMaterial({ color: 0xa8ffe0, transparent: true, opacity: .07, depthWrite: false, blending: THREE.AdditiveBlending })));
+  const N = 1400, pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) { const r = 18 + Math.random() * 40, p = Math.acos(2 * Math.random() - 1), t = Math.random() * 6.283; pos[i * 3] = r * Math.sin(p) * Math.cos(t); pos[i * 3 + 1] = r * Math.cos(p); pos[i * 3 + 2] = r * Math.sin(p) * Math.sin(t); }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  GLOBE.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xcfe8ff, size: .03, sizeAttenuation: true, transparent: true, opacity: .85 }));
+  GLOBE.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xd8ecff, size: .055, sizeAttenuation: true, transparent: true, opacity: .9 }));
   scene.add(GLOBE.stars);
   scene.add(root);
   scene.background = new THREE.Color(0x000000);
@@ -1717,17 +1778,18 @@ function plotGlobeHotspots() {
   const ix = ((S.index && S.index.theatres) || []);
   for (const [id, th] of Object.entries(S.TH)) {
     const info = ix.find(t => t.id === id) || {};
-    const p = llVec(th.focus[0], th.focus[1], 1.03);
+    const p = llVec(th.focus[0], th.focus[1], 1.035);
     const col = new THREE.Color(info.esc24 >= 60 ? 0xff5a3a : info.esc24 >= 35 ? 0xff9a2b : 0x3cff9a);
-    const m = new THREE.Mesh(new THREE.SphereGeometry(.018, 16, 12), new THREE.MeshBasicMaterial({ color: col }));
+    const m = new THREE.Mesh(new THREE.SphereGeometry(.028, 16, 12), new THREE.MeshBasicMaterial({ color: col }));
     m.position.copy(p); m.userData = { tid: id, kind: 'hot' }; GLOBE.root.add(m); GLOBE.hot.push(m);
-    const ring = new THREE.Mesh(new THREE.RingGeometry(.028, .038, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: .85, depthWrite: false }));
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.042, .058, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: .9, depthWrite: false }));
     ring.position.copy(p); ring.lookAt(0, 0, 0); ring.userData = { tid: id, kind: 'hot' }; GLOBE.root.add(ring); GLOBE.hot.push(ring);
-    const ping = new THREE.Mesh(new THREE.RingGeometry(.03, .032, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: .6, depthWrite: false }));
+    const ping = new THREE.Mesh(new THREE.RingGeometry(.045, .05, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: .65, depthWrite: false }));
     ping.position.copy(p); ping.lookAt(0, 0, 0); ping.userData = { pulse: 1, tid: id }; GLOBE.root.add(ping); GLOBE.hot.push(ping);
     const n24 = info.n24 || 0;
-    const hot = (info.esc24 || 0) >= 35 || n24 >= 20;
-    addLabel(`<b>${esc(th.name)}</b><small>${n24} in 24h${info.esc24 != null ? ' · esc ' + info.esc24 : ''}</small>`, 'gl', p.clone().multiplyScalar(1.06), hot ? 12 : 7, { ay: 1, globe: true, force: false, maxD: 3.6 });
+    const gname = { 'us-iran': 'US–Iran', 'israel-gaza-lebanon': 'Israel–Gaza', 'russia-ukraine': 'Russia–Ukraine', 'yemen-red-sea': 'Yemen', 'pakistan-india': 'Pakistan–India', 'china-taiwan': 'China–Taiwan', 'koreas': 'Koreas' }[id] || th.name;
+    const off = { 'israel-gaza-lebanon': [10, -18], 'yemen-red-sea': [-10, -4], 'us-iran': [1, 8], 'pakistan-india': [-12, 4], 'russia-ukraine': [6, -4] }[id] || [0, 0];
+    addLabel(`<b>${esc(gname)}</b>`, 'gl', llVec(th.focus[0] + off[0], th.focus[1] + off[1], 1.16), 12, { ay: 1, globe: true, force: true, maxD: 16 });
   }
   // recent confirmed events as smaller dots
   const now = Date.now() / 1000;
@@ -1743,11 +1805,11 @@ function plotGlobeHotspots() {
 function homeCamGlobe() {
   setGlobeControls();
   controls.target.set(0, 0, 0);
-  const pos = llVec(20, 40, 2.7);
-  camera.position.copy(pos);
+  const d = globeFitDist();
+  camera.position.copy(llVec(25, 70, d));
   controls.update();
-  camGoal.target = new THREE.Vector3(0, 0, 0); camGoal.dist = 2.5; camGoal.polar = null; camGoal.az = null; camGoal.fl = null;
-  S.home = { p: new THREE.Vector3(0, 0, 0), d: 2.5 };
+  camGoal.target = new THREE.Vector3(0, 0, 0); camGoal.dist = d; camGoal.polar = null; camGoal.az = null; camGoal.fl = null;
+  S.home = { p: new THREE.Vector3(0, 0, 0), d };
 }
 function globePick(ev) {
   if (!GLOBE.on || !GLOBE.root) return;
@@ -1830,7 +1892,8 @@ function animDroneCapture(tp, launch, sev) {
 function animTanker(tp, launch, sev, e) {
   const sea = hAt(tp.x, tp.z) <= .001;
   const a = tp.clone().add(new THREE.Vector3(-.85, 0, .3)), b = tp.clone().add(new THREE.Vector3(.7, 0, -.2)); a.y = b.y = sea ? 0 : Math.max(hAt(tp.x, tp.z), 0);
-  const sh = shipMesh('tanker', .42); fly(sh, lerpV(a, b), 7000, { keep: true });
+  camTo(tp.clone().setY(a.y + .1), 3.45, 1.18, 2.35, true);
+  const sh = shipMesh('tanker', .55); fly(sh, lerpV(a, b), 7000, { keep: true });
   scLoop(sh, () => { if (!sh.visible || Math.random() > .35) return; const w = add(sprite(SMOKE, new THREE.Color(0xe8f4ff), .03, false)); w.position.copy(sh.position); fade(w, w.material, 1400, u => { w.scale.setScalar(.03 + u * .06); w.material.opacity = (1 - u) * .5; }); });
   const o = launch(5.5, new THREE.Vector3(-3.2, 0, -1.8));
   const hitAt = Math.max(1400, salvo(o, [tp], { n: 1 }) - 200);
@@ -1912,7 +1975,7 @@ async function init() {
   setInterval(poll, 60000); setInterval(() => { if (document.visibilityState === 'visible') pollFast(); }, 60000); setInterval(renderFresh, 30000); renderFresh();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { poll(); pollFast(); } });
   $('#mkt').addEventListener('click', () => $('#mkt').classList.toggle('paused'));
-window.__fl = { runScen, openScen, endScen, loadScen, SC, S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground, loadTheatre, annotateEvent, GLOBE, liveEvent };
+window.__fl = { runScen, openScen, endScen, loadScen, SC, S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground, loadTheatre, annotateEvent, GLOBE, liveEvent, camera, controls };
 }
 init().catch(err => { $('#boot span').textContent = 'Could not start: ' + err.message; console.error(err); });
 
