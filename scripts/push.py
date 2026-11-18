@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pywebpush import webpush, WebPushException
 from py_vapid import Vapid
+from event_class import annotate
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data')
@@ -19,8 +20,8 @@ SUB_CLAIM = 'mailto:WajeehK@users.noreply.github.com'
 PUSH_HOSTS = re.compile(r'^https://([a-z0-9-]+\.)*(push\.apple\.com|fcm\.googleapis\.com|googleapis\.com|push\.services\.mozilla\.com|notify\.windows\.com)(/|$)')
 MAX_PER_HOUR, MAX_DEVICES = 4, 12
 KIN = {'missile', 'drone', 'air', 'naval', 'ground', 'mine'}
-ICON = {'missile': '🚀', 'drone': '🛩️', 'air': '✈️', 'naval': '⚓', 'ground': '💥'}
-NAME = {'missile': 'Missile attack', 'drone': 'Drone attack', 'air': 'Airstrike', 'naval': 'Naval incident', 'ground': 'Ground fighting'}
+ICON = {'missile': '🚀', 'drone': '🛩️', 'drone_capture': '🛩️', 'air': '✈️', 'naval': '⚓', 'tanker': '⚓', 'seizure': '⚓', 'ground': '💥', 'artillery': '💥', 'blast': '💥', 'ceasefire': '🕊️', 'cyber': '🖥️', 'troop': '🛫', 'facility': '💥', 'nuclear_site': '☢', 'mine': '💣'}
+NAME = {'missile': 'Missile strike', 'drone': 'Drone attack', 'drone_capture': 'Drone downed', 'air': 'Airstrike', 'naval': 'Naval incident', 'tanker': 'Tanker attacked', 'seizure': 'Vessel seized', 'ground': 'Ground fighting', 'artillery': 'Artillery strike', 'blast': 'Explosion', 'ceasefire': 'Ceasefire', 'cyber': 'Cyberattack', 'troop': 'Troop movement', 'facility': 'Facility struck', 'nuclear_site': 'Nuclear site struck', 'mine': 'Ship hit'}
 BANDS = [(15, 'CALM'), (35, 'TENSE'), (60, 'ELEVATED'), (80, 'HIGH'), (101, 'SEVERE')]
 LON = ZoneInfo('Europe/London')
 b64d = lambda s: base64.b64decode(s + '=' * (-len(s) % 4))
@@ -138,9 +139,14 @@ def main():
             for c in CL.get(tid, []):
                 if c['cid'] in d['sent'] or now - c['ts'] > 4 * 3600: continue
                 if any(nurl(o.get('url', '')) in set(d.get('surl', [])) for o in c.get('outlets', [])): d['sent'].append(c['cid']); continue
-                if c['type'] in KIN and c['sev'] >= 3 and not c.get('lowrel'): cands.append((c['sev'], tid, c))
+                meta = annotate(c.get('title',''), c.get('type'))
+                anim, conf = c.get('anim') or meta['anim'], c.get('confirmed', meta['confirmed'])
+                cas = bool(re.search(r"\b(killed|kills|dead|deaths?|casualt\w+|death toll)\b", c.get('title') or '', re.I))
+                major = (conf or anim != 'none') and not c.get('lowrel') and (
+                    (c['type'] in KIN and c['sev'] >= 3) or anim == 'ceasefire' or (cas and c['sev'] >= 3) or anim in ('tanker','seizure','drone_capture','nuclear_site') and c['sev'] >= 2)
+                if major: cands.append((c['sev'] if anim != 'ceasefire' else 4, tid, c, anim))
         cands.sort(key=lambda x: (-x[0], -x[2]['ts']))
-        for sev, tid, c in cands:
+        for sev, tid, c, anim in cands:
             if quiet and sev < 5:  # held for the 07:30 morning summary instead of being dropped once >4h old
                 d['sent'].append(c['cid'])
                 d.setdefault('held', []).append({'cid': c['cid'], 'tid': tid, 'type': c['type'], 'sev': sev, 'title': c['title'][:200], 'outlet': c.get('outlet', '')[:60], 'ts': c['ts']})
@@ -151,7 +157,7 @@ def main():
             tk = toks(c['title'])
             if any(len(tk & set(p)) / max(1, len(tk | set(p))) >= 0.4 for p in d['tok']): continue  # same incident re-clustered
             more = f" (+{c['n'] - 1} more outlets)" if c.get('n', 1) > 1 else ''
-            title = f"{ICON[c['type']]} {NAME[c['type']]} · {TH[tid]['name']}"
+            title = f"{ICON.get(anim, ICON.get(c['type'], '•'))} {NAME.get(anim, NAME.get(c['type'], 'Breaking'))} · {TH[tid]['name']}"
             if send(did, d, {'title': title, 'body': f"{c['title']} — {c['outlet']}{more}", 'tag': c['cid'], 'url': f"./#t={tid}&e={c['cid']}"}, urgent=sev >= 4):
                 d['log'].append(now); d['tok'].append(sorted(tk))
         if d.get('esc', True) and not quiet:

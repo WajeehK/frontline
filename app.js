@@ -1,6 +1,7 @@
 // Frontline — live conflict tracker. Data: data/*.json written by GitHub Actions (scripts/fetch.py). No AI anywhere.
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
+import { annotateEvent } from './eventClass.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -16,6 +17,7 @@ const TY = {
 };
 const GLY = { air: '✈', naval: '⚓', nuclear: '☢', capital: '★', base: '■', oil: '◆', area: '●', city: '●' };
 const ago = ts => { const m = Math.round((Date.now() / 1000 - ts) / 60); return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago'; };
+const typOf = e => TY[e.type] || TY.statement;
 const hm = ts => new Date(ts * 1000).toLocaleString(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
 const bust = () => '?t=' + Math.floor(Date.now() / 60000);
 async function getJSON(u) { const r = await fetch(u + bust(), { cache: 'no-store' }); if (!r.ok) throw new Error(u + ' ' + r.status); return r.json(); }
@@ -417,7 +419,7 @@ function evPos(e) {
 }
 const cap = s => s.replace(/\b\w/g, c => c.toUpperCase()).replace(/\b(Uk|Raf|Uae|Us|Npp|Idf)\b/g, w => w.toUpperCase());
 function callout(e, P, tag) {
-  const [nm0, , col] = TY[e.type]; const nm = tag || nm0;
+  const [nm0, , col] = typOf(e); const nm = tag || nm0;
   const where = P.off ? `<span class="off">↗ ${esc(cap(P.where))} (off-map)</span>` : P.unk ? 'location not stated' : esc(cap(P.where)) + (P.approx ? ' (country-level)' : '');
   const L = addLabel(`<b class="tg" style="color:${col}">${nm}</b>${esc(e.title.length > 90 ? e.title.slice(0, 88) + '…' : e.title)}<small>${esc(e.outlet)} · ${where}</small>`, 'co', P.p.clone().setY(P.p.y + .35), 10, { ay: 1, force: true });
   const kill = () => { if (L.dead) return; L.op = 0; setTimeout(() => { L.dead = true; L.el.remove(); labels = labels.filter(x => x !== L); }, 450); };
@@ -425,13 +427,20 @@ function callout(e, P, tag) {
 }
 function play(e, { fly = true } = {}) {
   if (!S.th) return;
+  annotateEvent(e);
+  if (S.tid === 'globe' && e._tid && S.TH[e._tid]) { location.hash = 't=' + e._tid; loadTheatre(e._tid).then(() => setTimeout(() => play(e, { fly }), 450)); return; }
   const P = evPos(e), to = P.p; const sides = S.th.sides; const sc = e.actor === 'A' ? sides[0].color : e.actor === 'B' ? sides[1].color : '#ffb35c';
   const col = new THREE.Color(sc).getHex();
   let from = e.actor ? originFor(e.actor, to) : null;
-  const sl = strikeLike(e);
-  if ((CINE_T.has(e.type) || sl) && S.mode !== 'scrub' && !SC.on && !document.body.classList.contains('cine')) { // v12: cinematic, type-matched
-    if (fly) liveCam(to, e.type === 'blast' || sl ? null : from);
-    callout(e, P, sl ? 'Reported strike' : null); ticker(e); liveStrike(e, to, from, sl); dropPin(e, P); return;
+  const canAnim = e.confirmed && e.anim && e.anim !== 'none' && !RMQ.matches && S.tid !== 'globe';
+  if (!canAnim) {
+    if (fly && S.tid !== 'globe') flyTo(to);
+    callout(e, P); ticker(e); if (S.tid !== 'globe') dropPin(e, P);
+    return;
+  }
+  if (S.mode !== 'scrub' && !SC.on && !document.body.classList.contains('cine')) {
+    if (fly) liveCam(to, ['blast', 'facility', 'ceasefire', 'cyber', 'troop'].includes(e.anim) ? null : from);
+    callout(e, P, (typeof tagOf === 'function' ? tagOf(e) : typOf(e))[0]); ticker(e); liveEvent(e, to, from); dropPin(e, P); return;
   }
   if (fly) flyTo(to);
   callout(e, P); ticker(e);
@@ -473,6 +482,7 @@ function flyTo(p, dist) { if (performance.now() - S.userAt < 15000) return; camG
   const off = camera.position.clone().sub(controls.target); const far = controls.target.distanceTo(p);
   camGoal.fl = { t0: performance.now(), dur: RMQ.matches ? 1 : Math.min(2600, 1100 + far * 160), a: controls.target.clone(), d0: off.length(), arc: Math.min(.35, far * .025) }; }
 function homeCam() {
+  if (S.tid === 'globe') { homeCamGlobe(); return; }
   const f = S.th.focus; const p = ground(f[0], f[1]); p.y = 0;
   const asp = innerWidth / innerHeight; const d = asp < 1 ? 19 / Math.max(.45, asp) * .42 : 15;
   controls.target.copy(p); camera.position.set(p.x, p.y + d * .78, p.z + d * .62); controls.update();
@@ -486,6 +496,14 @@ const score = es => es.reduce((s, e) => s + W5[e.sev] * (KIN.has(e.type) ? 1 : H
 const escOf = s => Math.round(100 * (1 - Math.exp(-s / 30)));
 const LV = [[15, 'CALM', '#3ccf7e'], [35, 'TENSE', '#c9b52e'], [60, 'ELEVATED', '#ff9a2b'], [80, 'HIGH', '#ff4b3e'], [101, 'SEVERE', '#ff2050']];
 function metrics(T) {
+  if (S.tid === 'globe' && S.index) {
+    const ths = ((S.index.theatres) || []).slice().sort((a, b) => b.esc24 - a.esc24); const hot = ths[0];
+    const e24 = hot ? hot.esc24 : 0, n24 = ths.reduce((s, x) => s + (x.n24 || 0), 0), lv = LV.find(l => e24 < l[0]);
+    countTo($('#escN'), e24); setTimeout(hudTabText, 900); $('#escL').textContent = lv[1]; $('#escL').style.color = lv[2];
+    $('#escSub').textContent = hot ? `Hottest: ${hot.name} · ${n24} reports worldwide` : `${n24} reports worldwide`;
+    $('#escBar').style.left = `calc(${e24}% - 1.5px)`;
+    S.m = { T, e24, e7: 0, front: 50, pa: 0, pb: 0, PA: 0, PB: 0, n24, n7: 0, lv }; return;
+  }
   const d1 = clustersIn(T - 86400, T), d7 = clustersIn(T - 7 * 86400, T);
   const e24 = escOf(score(d1)), e7 = escOf(score(d7) / 7);
   const pa = d7.filter(e => KIN.has(e.type) && e.actor === 'A'), pb = d7.filter(e => KIN.has(e.type) && e.actor === 'B');
@@ -503,7 +521,7 @@ function metrics(T) {
 // ---------------------------------------------------------------- ticker + feed
 function ticker(e) {
   S.tickE = e;
-  const [nm, ic, col] = TY[e.type];
+  const [nm, ic, col] = typOf(e);
   const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
   $('#ticker').innerHTML = `<div class="ic" style="box-shadow:inset 0 0 0 1px ${col}55">${ic}</div><div class="tx"><a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
    <div class="mt">${e.live ? '<span class="lvb">● LIVE</span>' : ''}<span class="tag" style="color:${col}">${nm}</span>${side ? `<span style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}<span>${esc(e.outlet)}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div></div>`;
@@ -514,10 +532,12 @@ function groupClusters() { const m = new Map(); for (const e of S.events) { if (
 function renderFeed() {
   const f = S.filter; const T = S.mode === 'scrub' ? S.T : Infinity;
   const list = S.clusters.filter(c => c.lead.ts <= T).filter(c => f === 'all' || (f === 'kin' ? KIN.has(c.lead.type) : f === 'dip' ? c.lead.type === 'diplomacy' : !KIN.has(c.lead.type) && c.lead.type !== 'diplomacy'));
-  $('#feedList').innerHTML = list.length ? list.slice(0, 150).map(c => { const e = c.lead; const [nm, ic, col] = TY[e.type]; const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
+  $('#feedList').innerHTML = list.length ? list.slice(0, 150).map(c => { const e = annotateEvent(c.lead); const [nm, ic, col] = typOf(e); const side = e.actor && S.th.sides[e.actor === 'A' ? 0 : 1] ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
+    const thn = e._tid && S.TH[e._tid] ? esc(S.TH[e._tid].name) + ' · ' : '';
+    const can = e.confirmed && e.anim && e.anim !== 'none';
     return `<div class="ev" data-id="${esc(e.id)}" role="button" tabindex="0"><div class="h"><span class="tag" style="color:${col}">${ic} ${nm}</span>${e.live ? '<span class="lvb" title="From the Al Jazeera fast lane (checked every ~2 min)">● LIVE</span>' : ''}<span class="sev" style="color:${col}">${'●'.repeat(e.sev)}${'○'.repeat(5 - e.sev)}</span>${side ? `<span style="color:${side.color};font-weight:700">${esc(side.short)} ▸</span>` : ''}${e.loc ? `<span>📍 ${esc(cap(e.loc.name))}</span>` : ''}</div>
     <a class="t" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
-    <div class="m"><span>${esc(e.outlet)}${e.via === 'GDELT' ? ' (via GDELT)' : e.via === 'LIVE' ? ' · fast lane' : ''} · ${hm(e.ts)} · ${ago(e.ts)}</span><button data-id="${e.id}">Show on map ▸</button></div>
+    <div class="m"><span>${thn}${esc(e.outlet)}${e.via === 'GDELT' ? ' (via GDELT)' : e.via === 'LIVE' ? ' · fast lane' : ''} · ${hm(e.ts)} · ${ago(e.ts)}</span>${can ? `<button data-id="${e.id}" class="play">Play animation ▸</button>` : `<span class="noanim">No animation · not a confirmed event</span>`}</div>
     ${(e.outlets || []).length > 1 ? `<details><summary>Covered by ${e.outlets.length} outlets: ${esc(e.outlets.map(o => o.outlet).join(', '))}</summary>${e.outlets.map(m => `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.outlet)} · ${hm(m.ts)} · ${esc(m.title)} ↗</a>`).join('')}</details>` : ''}</div>`; }).join('')
     : `<div class="empty">No reports in this filter yet. Data refreshes every ~15 minutes.</div>`;
 }
@@ -532,7 +552,7 @@ function setMode(m) {
   else if (m === 'loop' && S.queue.length <= 1) { mc.textContent = S.queue.length ? (S.firstVisit ? 'LATEST REPORT' : 'NOTHING NEW SINCE LAST VISIT · LATEST') : 'WATCHING FOR NEW REPORTS'; mc.className = 'modechip'; }
   else if (m === 'loop') { mc.textContent = `REPLAYING LAST ${S.loopH}H · ${S.queue.length} REPORTS`; mc.className = 'modechip'; }
   else { mc.textContent = 'TIMELINE · ' + hm(S.T); mc.className = 'modechip'; }
-  $('#liveTag').textContent = m === 'scrub' ? '● REPLAY' : '● LIVE'; $('#liveTag').classList.toggle('replay', m === 'scrub');
+  if (m === 'scrub') { $('#liveTag').textContent = '● REPLAY'; $('#liveTag').classList.add('replay'); } else { $('#liveTag').classList.remove('replay'); if (typeof renderFresh === 'function') renderFresh(); }
 }
 function buildQueue() {
   const now = Date.now() / 1000; let H = 24;
@@ -541,6 +561,7 @@ function buildQueue() {
   S.loopH = H; S.queue = q.slice(0, 24).reverse(); S.qi = 0;
 }
 function tick(now) {
+  if (S.tid === 'globe') { if (S.mode === 'scrub') return; return; }
   if (S.mode === 'scrub') { if (S.playing) { const step = (now - (S.lastT || now)) / 1000 * 3600 * (S.speed === 1 ? 1.5 : 6); const T0 = S.T; S.T = Math.min(Date.now() / 1000, S.T + step); for (const e of S.clusters.map(c => c.lead)) if (e.ts > T0 && e.ts <= S.T) play(e); scrubUI(); if (S.T >= Date.now() / 1000 - 60) togglePlay(false); } S.lastT = now; return; }
   if (S.brkQ && S.brkQ.length) { if (document.getElementById('intro') || $('#brk').className || SC.on) return; if (now > S.nextAt) { const e = S.brkQ.shift(); if (!BRK_SEEN.has(e.id)) { breaking(e); S.nextAt = now + 9000; } } return; }
   if (S.live && S.live.length) { if (now > S.nextAt) { setMode('live'); const e = S.live.shift(); if (isMajor(e) && !BRK_SEEN.has(e.id) && Date.now() / 1000 - e.ts < 6 * 3600) { breaking(e); S.nextAt = now + 9000; } else { play(e); S.nextAt = now + (cineOf(e) ? 8200 : 5200); } } return; }
@@ -630,14 +651,16 @@ $('#thBtn').addEventListener('click', () => {
   const kindOf = t => t.kind || S.TH[t.id]?.kind || 'conflict';
   const row = t => { const lv = LV.find(l => t.esc24 < l[0]); const ten = kindOf(t) === 'tension'; return `<button class="th${t.id === S.tid ? ' cur' : ''}${ten ? ' ten' : ''}" data-t="${t.id}"><span><b>${esc(t.name)}</b>${ten ? '<i class="tenTag">TENSIONS</i>' : ''}<small>${t.n24} reports in 24h · ${t.k24} kinetic · ${t.n7} in 7d</small></span><span class="e" style="color:${ten ? '#c9b37a' : lv[2]}">${t.esc24}<small style="font-size:9px;letter-spacing:.1em">${ten ? 'TENSION' : lv[1]}</small></span></button>`; };
   const ac = th.filter(t => kindOf(t) !== 'tension'), te = th.filter(t => kindOf(t) === 'tension');
-  $('#thList').innerHTML = `<div class="thGrp">Active conflicts</div>` + ac.map(row).join('') + (te.length ? `<div class="thGrp ten">Tensions <small>· not at open war; same rules, quieter styling</small></div>` + te.map(row).join('') : '');
+  const n24 = th.reduce((s, x) => s + (x.n24 || 0), 0);
+  const globeRow = `<button class="th${S.tid === 'globe' ? ' cur' : ''}" data-t="globe"><span><b>Globe</b><small>All conflicts · ${n24} reports in 24h · drag to spin, pinch to zoom</small></span><span class="e" style="color:#8fffc4">WORLD</span></button>`;
+  $('#thList').innerHTML = `<div class="thGrp">World</div>` + globeRow + `<div class="thGrp">Active conflicts</div>` + ac.map(row).join('') + (te.length ? `<div class="thGrp ten">Tensions <small>· not at open war; same rules, quieter styling</small></div>` + te.map(row).join('') : '');
   $('#thSheet').classList.add('open'); $('#scrim').classList.add('on');
 });
 $('#thList').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (!b) return; $('#thSheet').classList.remove('open'); $('#scrim').classList.remove('on'); if (b.dataset.t !== S.tid) { location.hash = 't=' + b.dataset.t; loadTheatre(b.dataset.t); } });
 function renderAbout() {
   const ix = S.index || {}; const src = (ix.sources || []);
   $('#aboutBody').innerHTML = `<h3>WHAT THIS IS</h3><p>Frontline turns <b>real news reports</b> into a 3D battlefield. Every animation is triggered by a published article, and every feed item links to it. Animations are <b>symbolic</b>: an arc means "a report of a missile attack here", not a real trajectory, unit or position. Nothing is predicted, invented or estimated, and no AI is used anywhere.</p>
-  <h3>HOW EVENTS ARE MADE</h3><ul><li>Every ~15 minutes a GitHub Action fetches public RSS feeds (and the GDELT 2.0 API when it answers).</li><li>A headline joins a theatre only if it names that conflict (e.g. Iran, Tehran, IRGC, Hormuz).</li><li>Fixed keyword rules pick the type (missile, drone, airstrike, naval, ground, cyber, deployment, sanctions, threat, diplomacy, statement). Hypothetical headlines ("could", "ready to") count as threats, not attacks.</li><li>Severity 1–5: a base for the type, +1 for casualty or destruction words, +1 for strategic targets (nuclear sites, capitals, energy), −1 for "minor/limited".</li><li>Location comes from a hand-built list of place names. Country-level mentions are shown as approximate. Places outside the map show as off-map.</li><li>The side that acted is taken from the headline's wording ("US strikes…"). If it's unclear, the arc falls from the sky.</li><li>Reports of the same incident (same type, within 12h, similar headline) are grouped so they count once.</li></ul>
+  <h3>HOW EVENTS ARE MADE</h3><ul><li>Every ~15 minutes a GitHub Action fetches public RSS feeds (and the GDELT 2.0 API when it answers).</li><li>A headline joins a theatre only if it names that conflict (e.g. Iran, Tehran, IRGC, Hormuz).</li><li>Fixed keyword rules pick the type. A second confirmed-event classifier (keyword + tense) decides whether an animation plays: only reports of something that happened — a strike, a drone captured, a tanker hit, a ceasefire agreed — are animated. Headlines that weigh options, warn, threaten, or say something "could" or "may" happen get no animation.</li><li>Severity 1–5: a base for the type, +1 for casualty or destruction words, +1 for strategic targets (nuclear sites, capitals, energy), −1 for "minor/limited".</li><li>Location comes from a hand-built list of place names. Country-level mentions are shown as approximate. Places outside the map show as off-map.</li><li>The side that acted is taken from the headline's wording ("US strikes…"). If it's unclear, the arc falls from the sky.</li><li>Reports of the same incident (same type, within 12h, similar headline) are grouped so they count once.</li></ul>
   <h3>ESCALATION METER</h3><p>Weights by severity: 1, 2, 4, 8, 16. Kinetic reports count in full; deployments, threats, cyber and sanctions count half; diplomacy and statements count zero. Score S is the sum over the last 24h, and Escalation = 100 × (1 − e<sup>−S/30</sup>). The 7d average uses S over 7 days ÷ 7. Bands: Calm &lt;15, Tense &lt;35, Elevated &lt;60, High &lt;80, then Severe.</p>
   <h3>FRONT LINE</h3><p>Kinetic pressure over 7 days per side, using the same weights. Position = 50 + 40 × (A − B) / (A + B + 5). It shows who is <i>reported</i> as acting more, not who is winning.</p>
   <h3>SOURCES (LAST REFRESH ${ix.updated ? esc(hm(ix.updated)) : '–'})</h3><ul>${src.map(s => `<li class="${s.ok ? 'srcok' : 'srcbad'}">${s.ok ? '✓' : '✗'} <span style="color:#ddd">${esc(s.src)}</span>${typeof s.n === 'number' ? ` · ${s.n} items` : ''}</li>`).join('')}</ul>
@@ -650,7 +673,7 @@ function renderAbout() {
 const liveG = new THREE.Group(); world.add(liveG);
 const LAY = Object.assign({ air: true, naval: true, bases: true, pins: true }, JSON.parse(localStorage.getItem('fl_lay') || '{}'));
 let liveLabels = [];
-const isMajor = e => KIN.has(e.type) && !e.lowrel && !/zerohedge|infowars|gatewaypundit|naturalnews|globalresearch|activistpost|beforeitsnews|veteranstoday|southfront/i.test(e.outlet || '') && (e.sev >= 4 || (e.sev >= 3 && ['missile', 'air', 'drone'].includes(e.type)));
+const isMajor = e => { annotateEvent(e); if (!e.confirmed || e.lowrel || !e.anim || e.anim === 'none') return false; if (/zerohedge|infowars|gatewaypundit|naturalnews|globalresearch|activistpost|beforeitsnews|veteranstoday|southfront/i.test(e.outlet || '')) return false; if (e.anim === 'ceasefire') return true; if (e.sev >= 3 && /\b(killed|dead|casualt|death toll)\b/i.test(e.title || '')) return true; return KIN.has(e.type) && (e.sev >= 4 || (e.sev >= 3 && ['missile', 'air', 'drone', 'tanker', 'drone_capture', 'nuclear_site', 'seizure'].includes(e.anim))); };
 function applyLayers() { markers.visible = LAY.bases; labels.forEach(l => { if (l.el.classList.contains('as')) l.dead2 = !LAY.bases; }); pinGroup.visible = LAY.pins; liveG.visible = LAY.air || LAY.naval; liveG.children.forEach(o => o.visible = LAY[o.userData.layer]); liveLabels.forEach(l => l.hide = !LAY[l.layer]); localStorage.setItem('fl_lay', JSON.stringify(LAY)); }
 const PLANE = (() => { const sh = new THREE.Shape(); sh.moveTo(0, .11); sh.lineTo(.02, .02); sh.lineTo(.09, -.02); sh.lineTo(.02, -.01); sh.lineTo(.015, -.07); sh.lineTo(.04, -.09); sh.lineTo(0, -.08); sh.lineTo(-.04, -.09); sh.lineTo(-.015, -.07); sh.lineTo(-.02, -.01); sh.lineTo(-.09, -.02); sh.lineTo(-.02, .02); sh.closePath(); const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return g; })();
 const HULL = (() => { const sh = new THREE.Shape(); sh.moveTo(0, .16); sh.lineTo(.035, .06); sh.lineTo(.035, -.12); sh.lineTo(-.035, -.12); sh.lineTo(-.035, .06); sh.closePath(); const g = new THREE.ShapeGeometry(sh); g.rotateX(-Math.PI / 2); return g; })();
@@ -779,7 +802,7 @@ function breaking(e, force) {
   if (!force && (BRK_SEEN.has(e.id) || S.mode === 'scrub' || document.visibilityState !== 'visible')) { if (!force) { S.live = S.live || []; } return; }
   BRK_SEEN.add(e.id); localStorage.setItem('fl_brk', JSON.stringify([...BRK_SEEN].slice(-200)));
   if (document.body.classList.contains('hudc')) { miniBreaking(e); return; }
-  const [nm, ic, col] = TY[e.type]; const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null; const P0 = evPos(e);
+  annotateEvent(e); const [nm, ic, col] = typOf(e); const side = e.actor && S.th && S.th.sides[e.actor === 'A' ? 0 : 1] ? S.th.sides[e.actor === 'A' ? 0 : 1] : null; const P0 = evPos(e);
   const where = P0.off ? cap(P0.where) + ' (off-map)' : P0.unk ? 'Location not stated' : cap(P0.where);
   const words = esc(e.title).split(' ').map((w, i) => `<span style="animation-delay:${1.15 + i * .07}s">${w}</span>`).join(' ');
   const el = $('#brk'); el.style.setProperty('--c', col);
@@ -1000,7 +1023,7 @@ const STRUCK_RX = /\b(destroy(s|ed)?|targets|targeted|struck|strikes|hit|hits|at
 const HYPO_RX = /\b(would|could|may|might|threat(en|ens|ened)?|vows?|warns?|if|plans?|planning|consider\w*|ready to|will|should|denies|denied|false|fake|no evidence)\b|\?/i;
 // a report typed threat/statement whose headline says a named facility was hit (e.g. "IRGC destroys U.S. radar in Bahrain"): drawn as an impact, never as a weapon
 const strikeLike = e => (e.type === 'threat' || e.type === 'statement') && !e.lowrel && STRUCK_RX.test(e.title || '') && FAC_RX.test(e.title || '') && !HYPO_RX.test(e.title || '');
-const cineOf = e => (CINE_T.has(e.type) || strikeLike(e)) && S.mode !== 'scrub' && !SC.on;
+const cineOf = e => { annotateEvent(e); return e.confirmed && e.anim && e.anim !== 'none' && S.mode !== 'scrub' && !SC.on; };
 const gnd = p => { const q = p.clone(); q.y = Math.max(hAt(q.x, q.z), 0); return q; };
 function liveCam(to, from) { // close, tilted framing of launch side + target; respects a user who is handling the map
   const base = innerWidth / innerHeight < 1 ? 5 : 4.2; let tg = to, d = base;
@@ -1192,11 +1215,29 @@ function showScenFx(sc) {
 }
 
 // ---------------------------------------------------------------- load
-function clearWorld() { for (const o of [...world.children]) if (o !== markers && o !== pinGroup && o !== liveG) world.remove(o); markers.clear(); pinGroup.clear(); pins.clear(); fx.length = 0; labels.forEach(l => l.el.remove()); labels = []; if (terrain) { terrain.geometry.dispose(); terrain = null; } }
+function clearWorld() { for (const o of [...world.children]) if (o !== markers && o !== pinGroup && o !== liveG) world.remove(o); markers.clear(); pinGroup.clear(); pins.clear(); fx.length = 0; labels.forEach(l => l.el.remove()); labels = []; if (terrain) { terrain.geometry.dispose(); terrain = null; } if (typeof disposeGlobe === 'function') disposeGlobe(); world.scale.set(1, 1, 1); }
 async function loadTheatre(tid) {
-  if (!S.TH[tid]) tid = 'us-iran';
-  const firstLoad = !S.tid; if (!firstLoad && !RMQ.matches) { const w = $('#wipe'); w.querySelector('b').textContent = S.TH[tid].name; w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); } else $('#boot').classList.remove('gone');
+  const isGlobe = tid === 'globe';
+  if (!isGlobe && !S.TH[tid]) tid = 'us-iran';
+  const firstLoad = !S.tid; const name = isGlobe ? 'Globe' : S.TH[tid].name;
+  if (!firstLoad && !RMQ.matches) { const w = $('#wipe'); w.querySelector('b').textContent = name; w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); } else $('#boot').classList.remove('gone');
   if (SC.on) endScen(); if (S.tid && S.tid !== tid) markVisit();
+  if (isGlobe) {
+    S.tid = 'globe'; S.th = GLOBE_TH; localStorage.setItem('fl_t', 'globe');
+    document.body.classList.add('globe'); document.body.classList.remove('tension');
+    $('#thName').textContent = 'Globe'; $('#thName').dataset.k = ''; $('#sideA').textContent = 'WORLD'; $('#sideB').textContent = '';
+    clearWorld(); await buildGlobe();
+    const ids = Object.keys(S.TH);
+    const packs = await Promise.all(ids.map(id => getJSON('data/' + id + '.json').catch(() => ({ events: [], clusters: [] }))));
+    const all = []; ids.forEach((id, i) => { for (const e of toLeads(packs[i])) { e._tid = id; annotateEvent(e); all.push(e); } });
+    all.sort((a, b) => b.ts - a.ts);
+    S.seen = new Set(); S.events = all; S.events.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters(); S.live = [];
+    plotGlobeHotspots(); setGlobeControls(); homeCam();
+    goLive(true); S.nextAt = 1e12; renderSent(); renderFresh(); metrics(Date.now() / 1000); renderFeed();
+    setTimeout(() => { $('#boot').classList.add('gone'); $('#hud').classList.remove('loading'); }, 300);
+    return;
+  }
+  document.body.classList.remove('globe'); restoreTheatreControls();
   S.tid = tid; S.th = S.TH[tid]; localStorage.setItem('fl_t', tid);
   $('#thName').textContent = S.th.name; document.body.classList.toggle('tension', S.th.kind === 'tension'); $('#thName').dataset.k = S.th.kind === 'tension' ? 'TENSIONS' : ''; $('#sideA').textContent = S.th.sides[0].short; $('#sideB').textContent = S.th.sides[1].short;
   document.documentElement.style.setProperty('--A', S.th.sides[0].color); document.documentElement.style.setProperty('--B', S.th.sides[1].color);
@@ -1204,9 +1245,9 @@ async function loadTheatre(tid) {
   const [d] = await Promise.all([getJSON('data/' + tid + '.json').catch(() => ({ events: [] })), buildTerrain(tid, S.th)]);
   buildMarkers(S.th); homeCam(); liveG.clear(); loadExtras(true);
   if (!RMQ.matches) { S.rise = performance.now(); world.scale.y = .02; }
-  S.seen = new Set(); S.events = mergeFast(toLeads(d)); S.events.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters(); S.live = [];
+  S.seen = new Set(); S.events = mergeFast(toLeads(d)); S.events.forEach(e => { annotateEvent(e); S.seen.add(e.id); }); S.clusters = groupClusters(); S.live = [];
   for (const c of S.clusters) { if (Date.now() / 1000 - c.lead.ts < 7 * 86400) dropPin(c.lead, evPos(c.lead)); }
-  goLive(true); S.nextAt = performance.now() + 1500; renderSent();
+  goLive(true); S.nextAt = performance.now() + 1500; renderSent(); renderFresh();
   renderFeed();
   setTimeout(() => { $('#boot').classList.add('gone'); $('#hud').classList.remove('loading'); }, 300);
 }
@@ -1403,7 +1444,7 @@ function miniMap(e) {
   return `<svg class="mm" viewBox="0 0 ${W.toFixed(2)} ${H.toFixed(2)}" preserveAspectRatio="xMidYMid meet"><path d="${lines}" vector-effect="non-scaling-stroke"/>${P}</svg>`;
 }
 function storyHTML(e) {
-  const [nm, ic, col] = TY[e.type]; const sd = S.th.sides; const side = k => sd[k === 'A' ? 0 : 1];
+  annotateEvent(e); const [nm, ic, col] = typOf(e); const sd = S.th.sides; const side = k => sd[k === 'A' ? 0 : 1];
   const who = [e.atk ? `<span class="chip2" style="color:${side(e.atk).color}">${esc(side(e.atk).short)} ▸ acted</span>` : '', e.icp ? `<span class="chip2" style="color:${side(e.icp).color}">${esc(side(e.icp).short)} intercepted</span>` : '',
     ...(e.men || []).filter(k => k !== e.atk && k !== e.icp).map(k => `<span class="chip2 dim" style="color:${side(k).color}">${esc(side(k).short)} mentioned</span>`)].join('');
   const P = evPos(e); const where = P.off ? cap(P.where) + ' (off this map)' : P.unk ? 'Location not stated' : cap(P.where) + (P.approx ? ' (country-level)' : '');
@@ -1418,7 +1459,7 @@ function storyHTML(e) {
    ${who ? `<div class="stwho">${who}</div>` : ''}
    ${e.desc ? `<p class="std">${esc(e.desc)}</p><p class="stsrc">Summary from the ${esc(e.outlet)} feed.</p>` : `<p class="stsrc">The feed gave no summary for this report.</p>`}
    ${cas ? `<div class="stcas">Figure stated in this report: <b>${esc(cas.text)}</b> (${esc(e.outlet)}). Not independently verified.</div>` : ''}
-   <div class="stcard"><div class="stcl">WHERE</div><div class="stloc"><div class="mmw">${miniMap(e)}</div><div><b>${esc(where)}</b><small>Placed from place names in the headline. Animations are symbolic.</small><button class="obtn stfly">Show on map ▸</button></div></div></div>
+   <div class="stcard"><div class="stcl">WHERE</div><div class="stloc"><div class="mmw">${miniMap(e)}</div><div><b>${esc(where)}</b><small>Placed from place names in the headline. Animations are symbolic.</small>${e.confirmed && e.anim && e.anim !== 'none' ? '<button class="obtn stfly">Play animation ▸</button>' : '<button class="obtn stfly">Show on map ▸</button>'}</div></div></div>
    <div class="stcard"><div class="stcl">HEADLINE TONE</div>${tn ? `<div class="srow"><span class="se">De-esc.</span><div class="sbar2"><em class="stn" style="left:${tv.toFixed(1)}%"></em></div><span class="se">Esc.</span></div><small>${tn.E.length ? 'Escalatory words: ' + esc([...new Set(tn.E.map(w => w.toLowerCase()))].join(', ')) + '. ' : ''}${tn.D.length ? 'De-escalatory: ' + esc([...new Set(tn.D.map(w => w.toLowerCase()))].join(', ')) + '.' : ''} Fixed word lists, same as the sentiment bar.</small>` : '<small>No words from either list in this headline.</small>'}</div>
    <div class="stcard"><div class="stcl">COVERAGE · ${outs.length} OUTLET${outs.length > 1 ? 'S' : ''}</div>${outs.map(o => `<div class="sto"><b>${esc(o.outlet)}${o.via === 'GDELT' ? ' <i>via GDELT</i>' : o.via === 'LIVE' ? ' <i>fast lane</i>' : ''}</b><span>${esc(o.title || '')}</span><small>${hm(o.ts)} · ${ago(o.ts)} · <a href="${esc(o.url)}" target="_blank" rel="noopener">Read original ↗</a></small></div>`).join('')}</div>
    ${rel.length ? `<div class="stcard"><div class="stcl">RELATED INCIDENTS</div>${rel.map(x => `<button class="strel" data-id="${esc(x.id)}"><span class="tag" style="color:${TY[x.type][2]}">${TY[x.type][1]} ${TY[x.type][0]}</span><b>${esc(x.title)}</b><small>${esc(x.outlet)} · ${ago(x.ts)}</small></button>`).join('')}</div>` : ''}
@@ -1428,7 +1469,7 @@ function storyHTML(e) {
 }
 function openStory(e, push = true) {
   if (!e) return; const el = $('#story'); storyOpen = e; el.innerHTML = storyHTML(e); el.scrollTop = 0; sheetDrag(el);
-  $('#stbar').innerHTML = `<button class="obtn stfly">Show on map</button><a class="obtn pri" href="${esc(e.url)}" target="_blank" rel="noopener">Read original at ${esc(e.outlet)} ↗</a>`;
+  annotateEvent(e); $('#stbar').innerHTML = `<button class="obtn stfly">${e.confirmed && e.anim && e.anim !== 'none' ? 'Play animation' : 'Show on map'}</button><a class="obtn pri" href="${esc(e.url)}" target="_blank" rel="noopener">Read original at ${esc(e.outlet)} ↗</a>`;
   requestAnimationFrame(() => { el.classList.add('open'); $('#stbar').classList.add('open'); }); document.body.classList.add('storyon');
   if (push) history.pushState({ story: e.id }, '', location.pathname + location.search + '#t=' + S.tid + '&s=' + encodeURIComponent(e.id));
   else history.replaceState({ story: e.id }, '', location.pathname + location.search + '#t=' + S.tid + '&s=' + encodeURIComponent(e.id));
@@ -1509,7 +1550,7 @@ $('#hudTog').addEventListener('click', () => setHud(true));
   const end = e => { if (!d) return; const dy = d.dy; d = null; t.style.transform = ''; if (e.type !== 'pointercancel' && (dy > 24 || Math.abs(dy) < 8)) setHud(false); };
   t.addEventListener('pointerup', end); t.addEventListener('pointercancel', end); })();
 function miniBreaking(e) {
-  const [nm, ic, col] = TY[e.type]; const b = $('#brkMini');
+  annotateEvent(e); const [nm, ic, col] = (typeof tagOf === 'function' ? tagOf(e) : typOf(e)); const b = $('#brkMini');
   b.innerHTML = `<span class="bmk" style="background:${col}">${ic} BREAKING · ${esc(nm)}</span><b>${esc(e.title)}</b><small>${esc(e.outlet)} · ${ago(e.ts)} · tap to read</small>`;
   b.onclick = () => { b.classList.remove('on'); openStory(e); };
   b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('on'), 6500);
@@ -1542,9 +1583,23 @@ async function pollFast() {
 }
 async function poll() {
   try {
-    S.index = await getJSON('data/index.json'); renderSent();
+    S.index = await getJSON('data/index.json'); renderSent(); renderFresh();
+    if (S.tid === 'globe') {
+      const ids = Object.keys(S.TH);
+      const packs = await Promise.all(ids.map(id => getJSON('data/' + id + '.json').catch(() => ({ events: [], clusters: [] }))));
+      const all = []; ids.forEach((id, i) => { for (const e of toLeads(packs[i])) { e._tid = id; annotateEvent(e); all.push(e); } });
+      all.sort((a, b) => b.ts - a.ts);
+      const fresh = all.filter(e => !S.seen.has(e.id));
+      if (fresh.length) {
+        S.events = all; fresh.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters();
+        S.live.push(...fresh.sort((a, b) => a.ts - b.ts));
+        if (S.mode !== 'scrub') metrics(Date.now() / 1000);
+        plotGlobeHotspots(); renderFeed();
+      }
+      return;
+    }
     const d = await getJSON('data/' + S.tid + '.json');
-    const all = mergeFast(toLeads(d)); const fresh = all.filter(e => !S.seen.has(e.id));
+    const all = mergeFast(toLeads(d)); all.forEach(annotateEvent); const fresh = all.filter(e => !S.seen.has(e.id));
     loadExtras();
     if (fresh.length) {
       S.events = all; fresh.forEach(e => S.seen.add(e.id)); S.clusters = groupClusters();
@@ -1566,6 +1621,7 @@ function frame(now) {
   for (const a of assets) { const s = 1 + .25 * Math.sin(now / 700 + a.phase); a.ring.scale.setScalar(.09 * s); a.gl.material.opacity = .6 + .3 * Math.sin(now / 500 + a.phase);
     if (a.ping) { const u = ((now / 1000 + a.phase) % 3.2) / 3.2; a.ping.scale.setScalar(.06 + u * .34); a.ping.material.opacity = (1 - u) ** 2 * .5; } }
   if (motes.visible) { motes.rotation.y = now / 90000; motes.position.y = Math.sin(now / 4000) * .05; }
+  if (GLOBE.on) { const tt = now / 1000; GLOBE.hot.forEach(o => { if (!o.userData.pulse) return; const u = (tt % 2.4) / 2.4; o.scale.setScalar(1 + u * 0.9); if (o.material) o.material.opacity = (1 - u) * (1 - u) * .7; }); }
   if (S.rise != null) { const u = Math.min(1, (now - S.rise) / 1300); world.scale.y = .02 + .98 * (1 - (1 - u) ** 3); if (u >= 1) S.rise = null; }
   camera.position.sub(_shk);
   const idle = performance.now() - S.userAt > 15000;
@@ -1593,6 +1649,253 @@ function frame(now) {
   renderer.render(scene, camera);
   placeLabels();
 }
+
+// ================================================================ v13: globe, curated event animations, freshness
+const ANIM_TY = {
+  drone_capture: ['DRONE DOWNED', '🛩️', '#ff9a3c'], tanker: ['TANKER HIT', '⚓', '#4fd1ff'], seizure: ['VESSEL SEIZED', '⚓', '#4fd1ff'],
+  artillery: ['ARTILLERY', '💥', '#ff7b54'], troop: ['TROOP MOVEMENT', '🛫', '#8fb8ff'], ceasefire: ['CEASEFIRE', '🕊️', '#ffffff'],
+  facility: ['FACILITY STRUCK', '💥', '#ff9a6a'], nuclear_site: ['NUCLEAR SITE', '☢', '#c8ff4a'], missile: TY.missile, drone: TY.drone,
+  air: TY.air, cyber: TY.cyber, blast: TY.blast, naval: TY.naval, mine: TY.mine
+};
+const tagOf = e => { annotateEvent(e); return (e.anim && ANIM_TY[e.anim]) || TY[e.type] || TY.statement; };
+const GLOBE_TH = { name: 'Globe', kind: 'globe', bbox: [-180, -85, 180, 85], zoom: 1, sides: [{ id: 'A', name: 'World', short: 'WORLD', color: '#4da3ff' }, { id: 'B', name: '', short: '', color: '#8fffc4' }], assets: [], labels: [], focus: [20, 35] };
+const GLOBE = { on: false, root: null, earth: null, hot: [], marks: [], stars: null, tex: null };
+const TH_CTRL = { minDistance: 2.5, maxDistance: 30, maxPolarAngle: 1.25, minPolarAngle: 0.12, enablePan: true,
+  mouseButtons: { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE },
+  touches: { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE } };
+
+function llVec(lat, lon, r = 1) {
+  const phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180;
+  return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th));
+}
+function setGlobeControls() {
+  controls.enablePan = false; controls.minDistance = 1.55; controls.maxDistance = 4.6;
+  controls.minPolarAngle = 0.12; controls.maxPolarAngle = Math.PI - 0.12;
+  controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+  controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_ROTATE };
+  controls.target.set(0, 0, 0);
+}
+function restoreTheatreControls() {
+  controls.enablePan = TH_CTRL.enablePan; controls.minDistance = TH_CTRL.minDistance; controls.maxDistance = TH_CTRL.maxDistance;
+  controls.minPolarAngle = TH_CTRL.minPolarAngle; controls.maxPolarAngle = TH_CTRL.maxPolarAngle;
+  controls.mouseButtons = TH_CTRL.mouseButtons; controls.touches = TH_CTRL.touches;
+}
+function disposeGlobe() {
+  GLOBE.on = false; GLOBE.hot = []; GLOBE.marks = [];
+  if (GLOBE.stars) { scene.remove(GLOBE.stars); GLOBE.stars.geometry.dispose(); GLOBE.stars.material.dispose(); GLOBE.stars = null; }
+  if (GLOBE.root) { scene.remove(GLOBE.root); GLOBE.root.traverse(o => { o.geometry?.dispose?.(); if (o.material) { const ms = [].concat(o.material); ms.forEach(m => { m.map?.dispose?.(); m.dispose?.(); }); } }); GLOBE.root = null; GLOBE.earth = null; }
+  scene.background = new THREE.Color(0x000000);
+}
+async function buildGlobe() {
+  disposeGlobe();
+  const root = new THREE.Group(); GLOBE.root = root; GLOBE.on = true;
+  if (!GLOBE.tex) {
+    GLOBE.tex = await new Promise((res, rej) => new THREE.TextureLoader().load('geo/earth.jpg', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); res(t); }, undefined, rej));
+  }
+  const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), new THREE.MeshPhongMaterial({
+    map: GLOBE.tex, emissive: new THREE.Color(0x14301c), emissiveMap: GLOBE.tex, emissiveIntensity: .85,
+    shininess: 6, specular: new THREE.Color(0x0a0a0a)
+  }));
+  GLOBE.earth = earth; root.add(earth);
+  const atmo = new THREE.Mesh(new THREE.SphereGeometry(1.035, 64, 48), new THREE.MeshBasicMaterial({ color: 0x3cff9a, transparent: true, opacity: .09, side: THREE.BackSide, depthWrite: false }));
+  root.add(atmo);
+  const atmo2 = new THREE.Mesh(new THREE.SphereGeometry(1.018, 64, 48), new THREE.MeshBasicMaterial({ color: 0x7ec8ff, transparent: true, opacity: .07, depthWrite: false }));
+  root.add(atmo2);
+  // starfield
+  const N = 900, pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) { const r = 12 + Math.random() * 30, p = Math.acos(2 * Math.random() - 1), t = Math.random() * 6.283; pos[i * 3] = r * Math.sin(p) * Math.cos(t); pos[i * 3 + 1] = r * Math.cos(p); pos[i * 3 + 2] = r * Math.sin(p) * Math.sin(t); }
+  const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  GLOBE.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xcfe8ff, size: .03, sizeAttenuation: true, transparent: true, opacity: .85 }));
+  scene.add(GLOBE.stars);
+  scene.add(root);
+  scene.background = new THREE.Color(0x000000);
+}
+function plotGlobeHotspots() {
+  if (!GLOBE.on || !GLOBE.root) return;
+  GLOBE.hot.forEach(o => { GLOBE.root.remove(o); o.geometry?.dispose?.(); o.material?.dispose?.(); });
+  GLOBE.hot = []; labels.forEach(l => { if (l.globe) { l.dead = true; l.el.remove(); } }); labels = labels.filter(l => !l.globe);
+  const ix = ((S.index && S.index.theatres) || []);
+  for (const [id, th] of Object.entries(S.TH)) {
+    const info = ix.find(t => t.id === id) || {};
+    const p = llVec(th.focus[0], th.focus[1], 1.03);
+    const col = new THREE.Color(info.esc24 >= 60 ? 0xff5a3a : info.esc24 >= 35 ? 0xff9a2b : 0x3cff9a);
+    const m = new THREE.Mesh(new THREE.SphereGeometry(.018, 16, 12), new THREE.MeshBasicMaterial({ color: col }));
+    m.position.copy(p); m.userData = { tid: id, kind: 'hot' }; GLOBE.root.add(m); GLOBE.hot.push(m);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(.028, .038, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: .85, depthWrite: false }));
+    ring.position.copy(p); ring.lookAt(0, 0, 0); ring.userData = { tid: id, kind: 'hot' }; GLOBE.root.add(ring); GLOBE.hot.push(ring);
+    const ping = new THREE.Mesh(new THREE.RingGeometry(.03, .032, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: .6, depthWrite: false }));
+    ping.position.copy(p); ping.lookAt(0, 0, 0); ping.userData = { pulse: 1, tid: id }; GLOBE.root.add(ping); GLOBE.hot.push(ping);
+    const n24 = info.n24 || 0;
+    const hot = (info.esc24 || 0) >= 35 || n24 >= 20;
+    addLabel(`<b>${esc(th.name)}</b><small>${n24} in 24h${info.esc24 != null ? ' · esc ' + info.esc24 : ''}</small>`, 'gl', p.clone().multiplyScalar(1.06), hot ? 12 : 7, { ay: 1, globe: true, force: false, maxD: 3.6 });
+  }
+  // recent confirmed events as smaller dots
+  const now = Date.now() / 1000;
+  for (const e of S.events) {
+    annotateEvent(e);
+    if (!e.confirmed || !e.loc || now - e.ts > 48 * 3600) continue;
+    const p = llVec(e.loc.lat, e.loc.lon, 1.02);
+    const col = new THREE.Color((tagOf(e)[2]) || '#ff9a3c');
+    const d = new THREE.Mesh(new THREE.SphereGeometry(.008, 8, 8), new THREE.MeshBasicMaterial({ color: col }));
+    d.position.copy(p); d.userData = { tid: e._tid, kind: 'evt', id: e.id }; GLOBE.root.add(d); GLOBE.hot.push(d);
+  }
+}
+function homeCamGlobe() {
+  setGlobeControls();
+  controls.target.set(0, 0, 0);
+  const pos = llVec(20, 40, 2.7);
+  camera.position.copy(pos);
+  controls.update();
+  camGoal.target = new THREE.Vector3(0, 0, 0); camGoal.dist = 2.5; camGoal.polar = null; camGoal.az = null; camGoal.fl = null;
+  S.home = { p: new THREE.Vector3(0, 0, 0), d: 2.5 };
+}
+function globePick(ev) {
+  if (!GLOBE.on || !GLOBE.root) return;
+  const r = canvas.getBoundingClientRect();
+  const v = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  const rc = new THREE.Raycaster(); rc.setFromCamera(v, camera);
+  const hits = rc.intersectObjects(GLOBE.hot, false);
+  const hit = hits.find(h => h.object.userData && h.object.userData.tid);
+  if (!hit) return;
+  const tid = hit.object.userData.tid;
+  if (hit.object.userData.kind === 'evt' && hit.object.userData.id) {
+    const e = S.events.find(x => x.id === hit.object.userData.id);
+    if (e && e._tid) { location.hash = 't=' + e._tid; loadTheatre(e._tid).then(() => setTimeout(() => play(e), 450)); return; }
+  }
+  if (tid && S.TH[tid]) { location.hash = 't=' + tid; loadTheatre(tid); }
+}
+(() => { let p0 = null; canvas.addEventListener('pointerdown', e => { p0 = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener('pointerup', e => { if (!p0) return; const d = Math.hypot(e.clientX - p0.x, e.clientY - p0.y); p0 = null; if (d > 10) return; globePick(e); }); })();
+
+function renderFresh() {
+  const t = S.index && S.index.updated, el = $('#liveTag'), fr = $('#feedFresh');
+  if (S.mode === 'scrub') { if (el) { el.textContent = '● REPLAY'; el.classList.add('replay'); } return; }
+  if (el) el.classList.remove('replay');
+  if (!t) { if (el) el.textContent = '● LIVE'; if (fr) fr.textContent = ''; return; }
+  const m = Math.round((Date.now() / 1000 - t) / 60), stale = m > 45;
+  const label = (stale ? '● DELAYED · ' : '● LIVE · ') + ago(t);
+  if (el) { el.textContent = label; el.classList.toggle('stale', stale); }
+  if (fr) { fr.textContent = 'Updated ' + ago(t); fr.classList.toggle('stale', stale); }
+}
+
+// ---- curated one-shot animations (symbolic of a reported event, not a real trajectory)
+function liveEvent(e, to, from) {
+  const anim = e.anim || 'none', sev = Math.max(2, Math.min(5, e.sev || 3)), tp = gnd(to);
+  const launch = (dmax, fb) => { if (from) { const v = from.clone().sub(tp).setY(0), L = v.length(); if (L > .6) return gnd(tp.clone().addScaledVector(v.normalize(), Math.min(L, dmax))); } return gnd(tp.clone().add(fb)); };
+  switch (anim) {
+    case 'drone_capture': return animDroneCapture(tp, launch, sev);
+    case 'tanker': return animTanker(tp, launch, sev, e);
+    case 'seizure': return animSeizure(tp, sev);
+    case 'missile': { const o = launch(6.5, new THREE.Vector3(-3.5, 0, -2)); const hitAt = Math.max(1200, salvo(o, [tp], { n: Math.min(6, sev + 1) }) - 400); setTimeout(() => { if (!SC.on) impact(tp, sev); }, hitAt); return; }
+    case 'air': { const o = launch(6, new THREE.Vector3(-3, 0, 1.5)); scJets(o, [tp], { n: sev >= 4 ? 3 : 2, bombs: true, alt: .8 }); setTimeout(() => { if (!SC.on) (FAC_RX.test(e.title || '') ? facilityHit(tp, sev) : impact(tp, sev)); }, 2650); return; }
+    case 'drone': { const o = launch(4.5, new THREE.Vector3(-2.5, 0, -1.2)); const hitAt = Math.max(1200, drones(o, [tp], { n: Math.min(6, sev + 1) }) - 300); setTimeout(() => { if (!SC.on) impact(tp, Math.max(2, sev - 1)); }, hitAt); return; }
+    case 'artillery': { const o = launch(1.6, new THREE.Vector3(-1.2, 0, .6)); salvo(o, [tp], { n: 4 + sev, rockets: true }); setTimeout(() => { if (!SC.on) { dustRing(tp, .25 + sev * .05, 2400); impact(tp, sev); } }, 2300); return; }
+    case 'troop': return animTroop(tp, sev);
+    case 'ceasefire': return animCeasefire(tp);
+    case 'cyber': return glitch(tp);
+    case 'nuclear_site': return animNukeSite(tp, launch, sev);
+    case 'facility': { const o = launch(5, new THREE.Vector3(-2.8, 0, -1.4)); salvo(o, [tp], { n: 2 }); setTimeout(() => { if (!SC.on) facilityHit(tp, sev); }, 1600); return; }
+    case 'blast': setTimeout(() => { if (!SC.on) (FAC_RX.test(e.title || '') ? facilityHit(tp, sev) : impact(tp, Math.max(2, sev - 1))); }, 300); return;
+    default: return liveStrike(e, to, from, false);
+  }
+}
+function capDroneMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(.12, .04, .2), new THREE.MeshLambertMaterial({ color: 0xc9c2b0 }));
+  g.add(body);
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(.36, .01, .08), new THREE.MeshLambertMaterial({ color: 0x9a9488 }));
+  wing.position.z = -.02; g.add(wing);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(.12, .08, .02), new THREE.MeshLambertMaterial({ color: 0x9a9488 }));
+  tail.position.set(0, .04, .1); g.add(tail);
+  [[.16, .14], [-.16, .14], [.16, -.14], [-.16, -.14]].forEach(([x, z]) => {
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(.02, .01, .02), new THREE.MeshLambertMaterial({ color: 0x555 }));
+    arm.position.set(x * .5, .02, z * .5); g.add(arm);
+    const rot = new THREE.Mesh(new THREE.CircleGeometry(.05, 16), new THREE.MeshBasicMaterial({ color: 0x88ffcc, transparent: true, opacity: .55, side: THREE.DoubleSide, depthWrite: false }));
+    rot.rotation.x = -Math.PI / 2; rot.position.set(x, .035, z); g.add(rot);
+  });
+  return g;
+}
+function animDroneCapture(tp, launch, sev) {
+  const a = launch(3.2, new THREE.Vector3(-2.4, 0, -.8)); a.y = Math.max(hAt(a.x, a.z), 0) + .55;
+  const b = tp.clone(); b.y = Math.max(hAt(b.x, b.z), 0) + .55;
+  const mid = a.clone().lerp(b, .55); mid.y += .2;
+  const d = capDroneMesh(); d.scale.setScalar(1.15);
+  fly(d, u => { const q = a.clone().lerp(mid, Math.min(1, u / .55)); if (u > .55) { const v = (u - .55) / .45; const s = mid.clone().lerp(gnd(tp), v); s.y = mid.y * (1 - v) + Math.max(hAt(s.x, s.z), 0) + .04 + Math.sin(v * Math.PI) * .2 * (1 - v); s.x += Math.sin(v * 14) * .05 * v; return s; } q.y += Math.sin(u * 8) * .02; return q; }, 4000, { bank: .35, keep: true, end: q => { const ring = add(new THREE.Mesh(new THREE.RingGeometry(.06, .11, 40), new THREE.MeshBasicMaterial({ color: 0x3cff9a, side: THREE.DoubleSide, transparent: true, depthWrite: false }))); ring.position.copy(gnd(q)); ring.rotation.x = -Math.PI / 2; fade(ring, ring.material, 3200, t => { ring.scale.setScalar(1 + t * 1.2); ring.material.opacity = .95 * (1 - t * .4); }); const L = addLabel('<b style="color:#3cff9a">SECURED</b> drone forced down', 'co', gnd(q).clone().setY(hAt(q.x, q.z) + .32), 11, { ay: 1, force: true }); setTimeout(() => { L.op = 0; setTimeout(() => { L.dead = true; L.el.remove(); labels = labels.filter(x => x !== L); }, 400); }, 3200); } });
+  // interceptor approaches, no explosion: a pale beam / jet pass
+  const j0 = b.clone().add(new THREE.Vector3(2.2, .7, .6)), j1 = mid.clone().add(new THREE.Vector3(-.2, .1, 0));
+  const jt = jetMesh2(.1); fly(jt, lerpV(j0, j1), 1600, { delay: 900, bank: .3 });
+  // electronic ring at intercept
+  setTimeout(() => { if (SC.on) return; const p = mid.clone(); const ring = add(new THREE.Mesh(new THREE.RingGeometry(.05, .06, 40), new THREE.MeshBasicMaterial({ color: 0x7dffb4, side: THREE.DoubleSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))); ring.position.copy(p); fade(ring, ring.material, 900, t => { ring.scale.setScalar(1 + t * 4); ring.material.opacity = .8 * (1 - t); }); lightFlash(p, .4, 500); }, 1700);
+}
+function animTanker(tp, launch, sev, e) {
+  const sea = hAt(tp.x, tp.z) <= .001;
+  const a = tp.clone().add(new THREE.Vector3(-.85, 0, .3)), b = tp.clone().add(new THREE.Vector3(.7, 0, -.2)); a.y = b.y = sea ? 0 : Math.max(hAt(tp.x, tp.z), 0);
+  const sh = shipMesh('tanker', .42); fly(sh, lerpV(a, b), 7000, { keep: true });
+  scLoop(sh, () => { if (!sh.visible || Math.random() > .35) return; const w = add(sprite(SMOKE, new THREE.Color(0xe8f4ff), .03, false)); w.position.copy(sh.position); fade(w, w.material, 1400, u => { w.scale.setScalar(.03 + u * .06); w.material.opacity = (1 - u) * .5; }); });
+  const o = launch(5.5, new THREE.Vector3(-3.2, 0, -1.8));
+  const hitAt = Math.max(1400, salvo(o, [tp], { n: 1 }) - 200);
+  setTimeout(() => {
+    if (SC.on || !sh.parent) return;
+    const q = sh.position.clone(); q.y += .06;
+    boom(q, Math.max(2, sev - 1), 0xff8a3a); if (sea) waterSpout(q, .6);
+    fires(q, .12, 7); smokePlume(q, { h: 1.1, w: .1, rate: 6, life: 7, col: 0x1a1715, glow: .8 });
+    // list the hull
+    const st = performance.now();
+    fx.push(now => { if (!sh.parent) return false; const u = Math.min(1, (now - st) / 1800); sh.rotation.z = -0.42 * (1 - Math.pow(1 - u, 3)); return u < 1 || sh.parent; });
+  }, hitAt);
+}
+function animSeizure(tp, sev) {
+  const a = tp.clone().add(new THREE.Vector3(-.5, 0, .2)), b = tp.clone(); a.y = b.y = Math.max(hAt(tp.x, tp.z), 0);
+  const mer = shipMesh('tanker', .24); fly(mer, lerpV(a, b), 1, { keep: true }); mer.position.copy(b);
+  const w0 = tp.clone().add(new THREE.Vector3(-1.4, 0, .7)), w1 = tp.clone().add(new THREE.Vector3(-.35, 0, .18)); w0.y = w1.y = b.y;
+  const war = shipMesh('warship', .22); fly(war, lerpV(w0, w1), 3200, { keep: true });
+  setTimeout(() => {
+    if (SC.on) return;
+    const p = b.clone().setY(b.y + .22);
+    const ring = add(new THREE.Mesh(new THREE.RingGeometry(.06, .1, 32), new THREE.MeshBasicMaterial({ color: 0x4fd1ff, side: THREE.DoubleSide, transparent: true, depthWrite: false })));
+    ring.position.copy(gnd(b)); ring.rotation.x = -Math.PI / 2;
+    fade(ring, ring.material, 2400, t => { ring.scale.setScalar(1 + t * 1.4); ring.material.opacity = .85 * (1 - t); });
+    const L = addLabel('<b style="color:#4fd1ff">SEIZED</b> vessel boarded', 'co', p, 11, { ay: 1, force: true });
+    setTimeout(() => { L.op = 0; setTimeout(() => { L.dead = true; L.el.remove(); labels = labels.filter(x => x !== L); }, 400); }, 2800);
+  }, 3000);
+}
+function animTroop(tp, sev) {
+  const dir = new THREE.Vector3(1.1, 0, .35); const start = tp.clone().sub(dir); start.y = Math.max(hAt(start.x, start.z), 0);
+  const n = 3 + (sev > 3 ? 1 : 0);
+  for (let i = 0; i < n; i++) {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(.07, .035, .11), new THREE.MeshLambertMaterial({ color: 0x6b7348 }));
+    const from = start.clone().add(new THREE.Vector3(-i * .12, 0, i * .05)); from.y = Math.max(hAt(from.x, from.z), 0) + .02;
+    const to = tp.clone().add(new THREE.Vector3(-i * .08, 0, i * .04)); to.y = Math.max(hAt(to.x, to.z), 0) + .02;
+    fly(body, lerpV(from, to), 3800 + i * 200, { delay: i * 220, keep: true });
+  }
+  const L = addLabel('<b style="color:#8fb8ff">MOVEMENT</b> reported troop / convoy', 'co', tp.clone().setY(tp.y + .3), 10, { ay: 1, force: true });
+  setTimeout(() => { L.op = 0; setTimeout(() => { L.dead = true; L.el.remove(); labels = labels.filter(x => x !== L); }, 400); }, 3200);
+}
+function animCeasefire(tp) {
+  const p = gnd(tp);
+  for (let i = 0; i < 3; i++) setTimeout(() => {
+    const ring = add(new THREE.Mesh(new THREE.RingGeometry(.08, .1, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, depthWrite: false })));
+    ring.position.copy(p); ring.rotation.x = -Math.PI / 2;
+    fade(ring, ring.material, 2200, t => { ring.scale.setScalar(1 + t * 5); ring.material.opacity = .7 * (1 - t); });
+  }, i * 400);
+  const fl = add(sprite(FLAG, new THREE.Color(0xffffff), .22, true)); fl.position.copy(p).y += .25;
+  fade(fl, fl.material, 4000, t => { fl.material.opacity = t < .2 ? t / .2 : (t > .75 ? (1 - t) / .25 : 1); fl.position.y = p.y + .25 + Math.sin(t * 8) * .02; });
+  const L = addLabel('<b style="color:#fff">CEASEFIRE REPORTED</b> stand-down · symbolic', 'co', p.clone().setY(p.y + .4), 11, { ay: 1, force: true });
+  setTimeout(() => { L.op = 0; setTimeout(() => { L.dead = true; L.el.remove(); labels = labels.filter(x => x !== L); }, 400); }, 3200);
+}
+function animNukeSite(tp, launch, sev) {
+  // facility silhouette — cooling-style towers + hall. Not a nuclear detonation.
+  const base = gnd(tp);
+  const hall = add(new THREE.Mesh(new THREE.BoxGeometry(.18, .07, .12), new THREE.MeshLambertMaterial({ color: 0x8a8f86 })));
+  hall.position.copy(base); hall.position.y += .035;
+  const mkT = (dx) => { const t = add(new THREE.Mesh(new THREE.CylinderGeometry(.04, .055, .16, 14), new THREE.MeshLambertMaterial({ color: 0x9aa094 }))); t.position.copy(base).add(new THREE.Vector3(dx, .1, -.08)); return t; };
+  const t1 = mkT(-.08), t2 = mkT(.08);
+  const o = launch(5.5, new THREE.Vector3(-3, 0, -1.6));
+  const hitAt = Math.max(1200, salvo(o, [base], { n: 2 }) - 300);
+  setTimeout(() => { if (SC.on) return; facilityHit(base, sev); [hall, t1, t2].forEach(m => fade(m, m.material, 2400, u => { m.material.opacity = 1 - u; m.material.transparent = true; })); }, hitAt);
+}
+
+
 async function init() {
   resize(); mountDock();
   S.TH = await getJSON('geo/theatres.json');
@@ -1606,10 +1909,10 @@ async function init() {
   const he = (location.hash.match(/e=([\w-]+)/) || [])[1]; if (he) { const e = S.events.find(x => x.id === he); if (e) setTimeout(() => breaking(e, true), 600); }
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { const m = ev.data || {}; if (m.type === 'open' && m.url) { const u = new URL(m.url); const t = (u.hash.match(/t=([\w-]+)/) || [])[1], e = (u.hash.match(/e=([\w-]+)/) || [])[1]; (t && t !== S.tid ? loadTheatre(t) : Promise.resolve()).then(() => { const ev2 = S.events.find(x => x.id === e); if (ev2) breaking(ev2, true); }); } if (m.type === 'pushed') poll(); });
   requestAnimationFrame(frame);
-  setInterval(poll, 120000); setInterval(() => { if (document.visibilityState === 'visible') pollFast(); }, 60000);
+  setInterval(poll, 60000); setInterval(() => { if (document.visibilityState === 'visible') pollFast(); }, 60000); setInterval(renderFresh, 30000); renderFresh();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { poll(); pollFast(); } });
   $('#mkt').addEventListener('click', () => $('#mkt').classList.toggle('paused'));
-window.__fl = { runScen, openScen, endScen, loadScen, SC,  S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground };
+window.__fl = { runScen, openScen, endScen, loadScen, SC, S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground, loadTheatre, annotateEvent, GLOBE, liveEvent };
 }
 init().catch(err => { $('#boot span').textContent = 'Could not start: ' + err.message; console.error(err); });
 

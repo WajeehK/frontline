@@ -5,9 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <meta name="theme-color" content="#000000">
 <meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="msapplication-navbutton-color" content="#000000">
 <title>Frontline · Live Conflict Tracker</title>
 <meta name="description" content="Live 3D conflict tracker: real news reports from public sources, mapped and animated on a 3D theatre map.">
-<link rel="manifest" href="manifest-v11.webmanifest">
+<link rel="manifest" href="manifest-v13.webmanifest">
 <link rel="icon" href="icons/b2r-favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="icons/b2r-logo.svg" type="image/svg+xml">
 <link rel="shortcut icon" href="icons/b2r-favicon-32.png">
@@ -17,12 +21,82 @@
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
 </head>
 <body>
-<div id="intro" aria-hidden="true"><div class="ir-grid"></div><div class="ir-rings"></div><div class="ir-sweep"></div><div class="ir-scan"></div><i class="ir-blip" style="left:22%;top:34%"></i><i class="ir-blip" style="left:71%;top:58%;animation-delay:.9s"></i><i class="ir-blip" style="left:58%;top:24%;animation-delay:1.5s"></i>
-<div class="ir-b2 l"><svg viewBox="-106 -48 212 104"><defs><linearGradient id="ib2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d1d9"/><stop offset="1" stop-color="#5b6672"/></linearGradient></defs><path d="M0 -42 L100 26 L98 33 L64 52 L43 37 L22 52 L0 38 L-22 52 L-43 37 L-64 52 L-98 33 L-100 26Z" fill="url(#ib2)" stroke="#0b0f12" stroke-width="2"/><path d="M0 -30 L9 -14 L0 -8 L-9 -14Z" fill="#1d262e"/><path d="M-30 4 L-18 2 M30 4 L18 2" stroke="#2b343c" stroke-width="5" stroke-linecap="round"/></svg></div><div class="ir-b2 c"><svg viewBox="-106 -48 212 104"><defs><linearGradient id="ib2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d1d9"/><stop offset="1" stop-color="#5b6672"/></linearGradient></defs><path d="M0 -42 L100 26 L98 33 L64 52 L43 37 L22 52 L0 38 L-22 52 L-43 37 L-64 52 L-98 33 L-100 26Z" fill="url(#ib2)" stroke="#0b0f12" stroke-width="2"/><path d="M0 -30 L9 -14 L0 -8 L-9 -14Z" fill="#1d262e"/><path d="M-30 4 L-18 2 M30 4 L18 2" stroke="#2b343c" stroke-width="5" stroke-linecap="round"/></svg></div><div class="ir-b2 r"><svg viewBox="-106 -48 212 104"><defs><linearGradient id="ib2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c9d1d9"/><stop offset="1" stop-color="#5b6672"/></linearGradient></defs><path d="M0 -42 L100 26 L98 33 L64 52 L43 37 L22 52 L0 38 L-22 52 L-43 37 L-64 52 L-98 33 L-100 26Z" fill="url(#ib2)" stroke="#0b0f12" stroke-width="2"/><path d="M0 -30 L9 -14 L0 -8 L-9 -14Z" fill="#1d262e"/><path d="M-30 4 L-18 2 M30 4 L18 2" stroke="#2b343c" stroke-width="5" stroke-linecap="round"/></svg></div>
-<div class="ir-word"><img src="icons/b2r-logo.svg" alt=""><b>FRONTLINE</b><span>LIVE CONFLICT TRACKER</span></div></div>
-<script>(function(){var d=document.documentElement,i=document.getElementById('intro'),n=Date.now(),l=0;try{l=+localStorage.getItem('fl_intro')||0;localStorage.setItem('fl_intro',n)}catch(e){}
-var q=(n-l<45000)||matchMedia('(prefers-reduced-motion: reduce)').matches;if(q)i.classList.add('quick');var t=q?450:3100;
-function done(){if(!i.parentNode)return;i.classList.add('out');setTimeout(function(){i.remove()},520)}setTimeout(done,t);i.addEventListener('pointerdown',done);})();</script>
+<div id="intro" aria-hidden="true">
+  <div class="bt-scanlines"></div>
+  <div class="bt-term" id="btTerm"></div>
+  <div class="bt-bio" id="btBio">
+    <div class="bt-eye">
+      <i class="bt-iris"></i>
+      <i class="bt-pupil"></i>
+      <i class="bt-lid"></i>
+      <i class="bt-crosshair"></i>
+      <b class="bt-scanbar"></b>
+    </div>
+    <span class="bt-biolbl">RETINA SCAN · IN PROGRESS</span>
+  </div>
+  <div class="bt-clearance" id="btClear">
+    <img class="bt-crest" src="icons/fl-crest.svg" alt="">
+    <div class="bt-stamp">CLEARANCE<span>TOP SECRET // AUTHORIZED</span></div>
+  </div>
+  <div class="bt-lock" id="btLock">
+    <div class="bt-globe"></div>
+    <div class="bt-reticle"><i></i><i></i><b></b></div>
+    <span>SATCOM UPLINK<br>GLOBE LOCK-ON</span>
+  </div>
+  <button class="bt-skip" type="button">TAP TO SKIP</button>
+</div>
+<script>
+(function(){
+  var i=document.getElementById('intro');
+  var force=/\bboot=1\b/.test(location.search);
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var seen=false;
+  try{ seen=!!sessionStorage.getItem('fl_boot13'); if(!force) sessionStorage.setItem('fl_boot13','1'); }catch(e){}
+  var quick=(!force && (seen||reduce));
+  if(quick){ i.classList.add('quick','stage-clear'); }
+  var lines=[
+    'FRONTLINE SYS v13.0 — CLASSIFIED',
+    'loading cryptographic keys .............. OK',
+    'opening one-time pad / AES-256 .......... OK',
+    'establishing SATCOM uplink .............. OK',
+    'authenticating operator .................',
+    'biometric challenge issued',
+    'RETINA MATCH · 99.97%',
+    'CLEARANCE: TOP SECRET // AUTHORIZED',
+    'acquiring geoint feed ................... OK',
+    'GLOBE LOCK-ON'
+  ];
+  var term=document.getElementById('btTerm');
+  var n=0;
+  function addLine(){
+    if(!term||n>=lines.length) return;
+    var d=document.createElement('div');
+    d.textContent='> '+lines[n++];
+    term.appendChild(d);
+    term.scrollTop=term.scrollHeight;
+  }
+  var timers=[];
+  if(!quick && !window.__flHoldIntro){
+    addLine();
+    timers.push(setInterval(function(){ addLine(); if(n>=lines.length) clearInterval(timers[0]); }, 280));
+    timers.push(setTimeout(function(){ i.classList.add('stage-bio'); }, 800));
+    timers.push(setTimeout(function(){ i.classList.add('stage-clear'); i.classList.remove('stage-bio'); }, 2000));
+    timers.push(setTimeout(function(){ i.classList.add('stage-lock'); }, 2500));
+  } else if(window.__flHoldIntro){
+    addLine(); addLine(); addLine(); addLine(); addLine();
+  }
+  var dur=quick?400:3800;
+  function done(){
+    if(window.__flHoldIntro) return;
+    if(!i.parentNode||i.classList.contains('out')) return;
+    i.classList.add('out');
+    timers.forEach(function(x){ clearTimeout(x); clearInterval(x); });
+    setTimeout(function(){ i.remove(); }, 560);
+  }
+  setTimeout(done,dur);
+  i.addEventListener('pointerdown',done);
+})();
+</script>
 <canvas id="scene" aria-label="3D map of the conflict theatre"></canvas>
 <div id="labels" aria-hidden="true"></div>
 <div id="vign" aria-hidden="true"></div>
@@ -63,7 +137,7 @@ function done(){if(!i.parentNode)return;i.classList.add('out');setTimeout(functi
 
 <aside id="feed" class="sheet glass" aria-label="Event feed">
  <div class="grab"></div>
- <div class="shead"><h2>Event feed</h2><div class="filters" role="tablist"><button data-f="all" class="on">All</button><button data-f="kin">Kinetic</button><button data-f="dip">Diplomacy</button><button data-f="oth">Other</button></div></div>
+ <div class="shead"><h2>Event feed</h2><span id="feedFresh" class="fresh">–</span><div class="filters" role="tablist"><button data-f="all" class="on">All</button><button data-f="kin">Kinetic</button><button data-f="dip">Diplomacy</button><button data-f="oth">Other</button></div></div>
  <div id="feedList" class="slist"><div class="skel"><i></i><i></i><i></i></div><div class="skel"><i></i><i></i><i></i></div><div class="skel"><i></i><i></i><i></i></div><div class="skel"><i></i><i></i><i></i></div></div>
 </aside>
 
@@ -86,14 +160,14 @@ function done(){if(!i.parentNode)return;i.classList.add('out');setTimeout(functi
 <aside id="about" class="sheet glass" aria-label="About">
  <div class="grab"></div>
  <div class="slist prose" id="aboutBody"></div>
- <p class="ver">Frontline v12 · imagery: Sentinel-2 cloudless by EOX (CC BY 4.0) · terrain &amp; hi-res relief: AWS Terrain Tiles (Mapzen, open data)</p>
+ <p class="ver">Frontline v13 · imagery: Sentinel-2 cloudless by EOX (CC BY 4.0) · globe: NASA night lights (public domain) · terrain: AWS Terrain Tiles (Mapzen, open data)</p>
 </aside>
 
 <div id="thSheet" class="sheet glass small" role="listbox" aria-label="Choose conflict"><div class="grab"></div><div class="shead"><h2>Conflicts</h2></div><div id="thList" class="slist"></div></div>
 <div id="scrim"></div>
 <div id="gScrim"></div>
 <aside id="gauges" class="glass" aria-label="Indicators" aria-hidden="true"><div class="gHead"><div><small>INDICATORS · LIVE DATA</small><h2 id="gTh">–</h2></div><button id="gX" aria-label="Close indicators">✕</button></div><div id="gBody"></div><div class="gGrab" role="button" tabindex="0" aria-label="Close indicators"><i></i></div></aside>
-<div id="boot"><img src="icons/b2r-logo.svg" alt=""><span>Loading theatre…</span></div>
+<div id="boot"><span class="bt-bootline">ACQUIRING GEOINT</span><span>Loading theatre…</span></div>
 <noscript>Frontline needs JavaScript and WebGL.</noscript>
 <script type="module" src="app.js"></script>
 </body>

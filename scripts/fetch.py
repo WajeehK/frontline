@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 sys.path.insert(0, os.path.dirname(__file__))
 from gazetteer import G
+from event_class import annotate
 ROOT = os.path.join(os.path.dirname(__file__), '..')
 T = json.load(open(os.path.join(ROOT, 'geo/theatres.json')))
 NOW = time.time()
@@ -409,9 +410,11 @@ def cluster(evs):
         outlets = []
         for m in ms:
             if not any(o['outlet'] == m['outlet'] for o in outlets): outlets.append({"outlet": m['outlet'], "url": m['url'], "title": m['title'], "ts": m['ts'], "via": m.get('via', 'RSS'), "desc": (m.get('desc') or '')[:200]})
+        anims = [m.get('anim') for m in [lead] + ms if m.get('anim') and m.get('anim') != 'none']
         out.append({"cid": cid, "ts": c['ts'], "last": ms[-1]['ts'], "type": c['type'], "sev": c['sev'], "actor": c['actor'], "atk": c['atk'], "icp": c['icp'], "men": c['men'],
                     "loc": c['loc'], "title": lead['title'], "url": lead['url'], "outlet": lead['outlet'], "n": len(ms), "outlets": outlets,
-                    "desc": next((d for d in (summ(m) for m in [lead] + ms) if d), ''), "lowrel": 1 if all(m.get('lowrel') for m in ms) else 0})
+                    "desc": next((d for d in (summ(m) for m in [lead] + ms) if d), ''), "lowrel": 1 if all(m.get('lowrel') for m in ms) else 0,
+                    "confirmed": 1 if any(m.get('confirmed') for m in ms) else 0, "anim": anims[0] if anims else 'none'})
     return sorted(out, key=lambda c: -c['ts'])
 
 def naval_reports(items, old):
@@ -469,8 +472,10 @@ def make_event(tid, it):
         atk = act or lnc or (('B' if tgt == 'A' else 'A') if tgt else None)
     if not act: act = atk if typ in KINETIC else None
     men = sorted(side for side, pats in SIDE_ALIASES[tid].items() if any(re.search(*_alias_rx(p0)[:1], title, _alias_rx(p0)[1]) for p0 in pats))
+    meta = annotate(title, typ)
     return eid, {"id": eid, "ts": int(it['ts']), "title": title[:220], "desc": (it.get('desc') or '')[:220], "url": it['url'],
-               "outlet": it['outlet'], "via": it.get('via', 'RSS'), "lowrel": 1 if low_rel(it['outlet']) else 0, "type": typ, "sev": sev, "actor": act, "atk": atk, "icp": icp, "men": men, "loc": loc}
+               "outlet": it['outlet'], "via": it.get('via', 'RSS'), "lowrel": 1 if low_rel(it['outlet']) else 0, "type": typ, "sev": sev, "actor": act, "atk": atk, "icp": icp, "men": men, "loc": loc,
+               "confirmed": 1 if meta["confirmed"] else 0, "anim": meta["anim"]}
 
 # ---- coverage sentiment (fixed lexicon, no AI): escalatory vs de-escalatory wording in recent headlines
 ESC_W = re.compile(r"\b(strikes?|struck|airstrikes?|attack(s|ed|ing)?|retaliat\w*|escalat\w*|missiles?|drones?|bomb\w*|kill(s|ed|ing)?|dead|deaths?|invad\w*|invasion|offensive|threat(s|en\w*)?|warn(s|ed|ing)?|war|wars|mobili[sz]\w*|shell(s|ed|ing)|assault\w*|raids?|clash(es|ed)?|revenge|ultimatum|seiz\w*|explosions?|blasts?|launch(es|ed)?|fire[sd]?|intercept\w*|casualt\w*|wounded|injur\w*|sanction\w*|hostil\w*|bombard\w*|siege)\b", re.I)
