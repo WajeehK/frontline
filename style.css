@@ -47,7 +47,10 @@ a{color:#9cc8ff}
 #labels .off{color:#ffc04d}
 /* ticker */
 #ticker{position:fixed;z-index:9;left:10px;right:10px;bottom:calc(var(--dockH) + 14px + var(--safeB));padding:10px 12px;display:flex;gap:10px;align-items:flex-start;transition:opacity .35s,transform .35s;min-height:58px}
-#ticker:empty{display:none}
+#ticker .tnav{flex:none;display:flex;align-items:center;gap:2px;align-self:center;font:600 10px ui-monospace,monospace;color:var(--dim)}
+#ticker .tnav button{width:30px;height:30px;border:0;border-radius:10px;background:rgba(255,255,255,.08);display:grid;place-items:center;-webkit-tap-highlight-color:transparent}
+#ticker .tnav button:disabled{opacity:.3}
+#ticker .tnav svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
 #ticker.hide{opacity:0;transform:translateY(12px);pointer-events:none}
 #ticker .ic{flex:none;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:17px;background:rgba(255,255,255,.07)}
 #ticker .tx{flex:1;min-width:0}

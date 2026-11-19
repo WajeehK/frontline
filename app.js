@@ -562,12 +562,15 @@ function metrics(T) {
 }
 
 // ---------------------------------------------------------------- ticker + feed
+function latestEvs() { return groupClusters().map(g => g.lead).sort((a, b) => b.ts - a.ts).slice(0, 30); }
+function tickerNav(d) { const L = latestEvs(); if (!L.length) return; let i = L.findIndex(x => x.id === (S.tickE && S.tickE.id)); i = i < 0 ? 0 : Math.max(0, Math.min(L.length - 1, i + d)); ticker(L[i]); }
 function ticker(e) {
   S.tickE = e;
+  const L = latestEvs(); const li = L.findIndex(x => x.id === e.id);
   const [nm, ic, col] = typOf(e);
   const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
   $('#ticker').innerHTML = `<div class="ic" style="box-shadow:inset 0 0 0 1px ${col}55">${ic}</div><div class="tx"><a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
-   <div class="mt">${e.live ? '<span class="lvb">● LIVE</span>' : ''}<span class="tag" style="color:${col}">${nm}</span>${side ? `<span style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}<span>${esc(e.outlet)}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div></div>`;
+   <div class="mt">${e.live ? '<span class="lvb">● LIVE</span>' : ''}<span class="tag" style="color:${col}">${nm}</span>${side ? `<span style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}<span>${esc(e.outlet)}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div></div><div class="tnav"><button data-tn="-1" aria-label="Newer event" ${li <= 0 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><span>${li < 0 ? '' : (li + 1) + '/' + L.length}</span><button data-tn="1" aria-label="Older event" ${li < 0 || li >= L.length - 1 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button></div>`;
   $('#ticker').classList.remove('hide'); const tk = $('#ticker'); tk.classList.remove('tin'); void tk.offsetWidth; tk.classList.add('tin');
 }
 function toLeads(d) { if (d.clusters) return d.clusters.map(c => ({ ...c, id: c.cid, via: (c.outlets && c.outlets[0] || {}).via })); return d.events || []; }
@@ -605,6 +608,7 @@ function buildQueue() {
   S.loopH = H; S.queue = q.slice(0, 24).reverse(); S.qi = 0;
 }
 function tick(now) {
+  if (!S.tickE && S.events && S.events.length) { const L = latestEvs(); if (L.length) ticker(L[0]); }
   if (S.tid === 'globe') { if (S.mode === 'scrub') return; return; }
   if (S.mode === 'scrub') { if (S.playing) { const step = (now - (S.lastT || now)) / 1000 * 3600 * (S.speed === 1 ? 1.5 : 6); const T0 = S.T; S.T = Math.min(Date.now() / 1000, S.T + step); for (const e of S.clusters.map(c => c.lead)) if (e.ts > T0 && e.ts <= S.T) play(e); scrubUI(); if (S.T >= Date.now() / 1000 - 60) togglePlay(false); } S.lastT = now; return; }
   if (S.alertHold) return;
@@ -1847,7 +1851,7 @@ addEventListener('pagehide', markVisit);
 
 // ---- sheets: one close path for every panel; handle tap + drag-down to close
 const TAB_SHEETS = { feed: 1, sides: 2, replay: 3, about: 4 };
-$('#ticker').addEventListener('click', ev => { if (!S.tickE) return; ev.preventDefault(); openStory(S.tickE); });
+$('#ticker').addEventListener('click', ev => { const nb = ev.target.closest('[data-tn]'); if (nb) { ev.preventDefault(); ev.stopPropagation(); S.userAt = performance.now(); S.nextAt = performance.now() + 20000; tickerNav(+nb.dataset.tn); return; } if (!S.tickE) return; ev.preventDefault(); openStory(S.tickE); });
 function closeSheet(el) {
   if (!el) return; if (el.id === 'story') { closeStory(); return; }
   if (TAB_SHEETS[el.id] && !(DESK.matches && el.id === 'feed')) { if (dockI === TAB_SHEETS[el.id]) go(0); else el.classList.remove('open'); return; }
