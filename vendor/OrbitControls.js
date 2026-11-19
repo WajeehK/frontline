@@ -1119,10 +1119,19 @@ function onPointerDown( event ) {
 
 	if ( this._pointers.length === 0 ) {
 
-		this.domElement.setPointerCapture( event.pointerId );
+		// Avoid setPointerCapture on touch: on Android Chrome it can swallow the second finger,
+		// so two-finger twist/tilt never starts and the gesture stays a one-finger pan.
+		if ( event.pointerType !== 'touch' ) {
 
-		this.domElement.addEventListener( 'pointermove', this._onPointerMove );
-		this.domElement.addEventListener( 'pointerup', this._onPointerUp );
+			this.domElement.setPointerCapture( event.pointerId );
+
+		}
+
+		const doc = this.domElement.ownerDocument;
+		doc.addEventListener( 'pointermove', this._onPointerMove );
+		doc.addEventListener( 'pointerup', this._onPointerUp );
+		doc.addEventListener( 'pointercancel', this._onPointerUp );
+		doc.addEventListener( 'pointerdown', this._onPointerDown );
 
 	}
 
@@ -1170,10 +1179,17 @@ function onPointerUp( event ) {
 
 		case 0:
 
-			this.domElement.releasePointerCapture( event.pointerId );
+			if ( event.pointerType !== 'touch' ) {
 
-			this.domElement.removeEventListener( 'pointermove', this._onPointerMove );
-			this.domElement.removeEventListener( 'pointerup', this._onPointerUp );
+				try { this.domElement.releasePointerCapture( event.pointerId ); } catch ( err ) {}
+
+			}
+
+			const doc = this.domElement.ownerDocument;
+			doc.removeEventListener( 'pointermove', this._onPointerMove );
+			doc.removeEventListener( 'pointerup', this._onPointerUp );
+			doc.removeEventListener( 'pointercancel', this._onPointerUp );
+			doc.removeEventListener( 'pointerdown', this._onPointerDown );
 
 			this.dispatchEvent( _endEvent );
 
