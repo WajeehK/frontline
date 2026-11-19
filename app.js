@@ -1771,6 +1771,7 @@ function frame(now) {
   camera.position.sub(_shk);
   const idle = performance.now() - S.userAt > 15000;
   if (CINE.on) cineUpdate(now, dt);
+  else if (S.cineFollow) { /* weapon-follow cam is driven in the animation loop */ }
   else if (camGoal.target && idle && camGoal.fl) {  // eased flight: smootherstep path + altitude arc
     const F = camGoal.fl; const u = Math.min(1, (now - F.t0) / F.dur); const e = u * u * u * (u * (u * 6 - 15) + 10);
     const off = camera.position.clone().sub(controls.target);
@@ -1849,7 +1850,7 @@ function makeGlobeShader(theme) {
       void main(){
         vec3 day=texture2D(dayMap,vUv).rgb; vec3 night=texture2D(nightMap,vUv).rgb; float water=texture2D(specMap,vUv).r;
         vec3 n=normalize(vN); vec3 L=normalize(sunDir); float ndl=dot(n,L); float lit=smoothstep(-0.12,0.22,ndl);
-        vec3 cities=night*night*vec3(1.6,1.45,1.1);
+        vec3 cities=night*vec3(1.8,1.55,1.15)*1.35;
         vec3 col;
         if(theme>0.5&&theme<1.5){ col=night*0.28+cities*1.7+day*lit*0.12; }
         else if(theme>4.5){ float l=dot(day,vec3(.25,.5,.25)); col=mix(vec3(.03,.0,.06),vec3(.45,.08,.02),l); col+=cities*0.4; }
@@ -2032,19 +2033,29 @@ function renderFresh() {
 // ---- v14 cinematic delivery (symbolic of a reported event, not a real trajectory)
 function cineBallistic(from, to, { n = 1, sev = 3, intercept = false } = {}) {
   const s0b = gnd(from), e0 = gnd(to); const dist = s0b.distanceTo(e0);
-  const H = Math.max(1.6, dist * .45), dur = 3000 + dist * 70;
+  const H = Math.max(1.8, dist * .48), dur = 3400 + dist * 70;
   const az = Math.atan2(e0.x - s0b.x, e0.z - s0b.z) + .95;
-  camTo(s0b.clone().setY(s0b.y + .18), 3.15, 1.18, az, true);
-  setTimeout(() => { if (SC.on) return; camTo(s0b.clone().lerp(e0, .45).setY(H * .5), 4.6, 1.08, az, false); }, dur * .28);
-  setTimeout(() => { if (SC.on) return; camTo(e0.clone().setY(e0.y + .1), 3.05, 1.2, az + .35, false); }, dur * .68);
+  camTo(s0b.clone().setY(s0b.y + .2), 2.15, 1.16, az, true);
+  setTimeout(() => { if (SC.on) return; camTo(s0b.clone().lerp(e0, .42).setY(H * .55), 2.05, 1.1, az + .35, false); }, dur * .18);
+  setTimeout(() => { if (SC.on) return; S.cineFollow = 0; controls.minDistance = TH_CTRL.minDistance; camTo(e0.clone().setY(e0.y + .22), 2.45, 1.02, az + .5, true); }, dur * .64);
   let last = 0;
   for (let i = 0; i < n; i++) {
     const s0 = s0b.clone().add(new THREE.Vector3((i - (n - 1) / 2) * .16, 0, (i - (n - 1) / 2) * .1)); s0.y = Math.max(hAt(s0.x, s0.z), 0) + .03;
     const e = e0.clone().add(new THREE.Vector3((Math.random() - .5) * .1, 0, (Math.random() - .5) * .1)); e.y = Math.max(hAt(e.x, e.z), 0);
-    const m = missileMesh(.5); exhaustTrail(m, { w: .11, life: 2400 });
+    const m = missileMesh(.9); exhaustTrail(m, { w: .16, life: 2800, rate: 24 });
     const d0 = i * 320; last = Math.max(last, d0 + dur);
     scT(() => { const f = add(sprite(GLOW, new THREE.Color(0xfff3c0), .28)); f.position.copy(s0); fade(f, f.material, 600, u => { f.material.opacity = 1 - u; f.scale.setScalar(.28 + u * .4); }); smokePlume(s0, { h: .35, w: .06, rate: 7, life: 2.2, col: 0x9a948a, glow: .5 }); }, d0);
     fly(m, arcF(s0, e, H), dur, { delay: d0, onT: [[.72, q => { if (m.userData.plume) m.userData.plume.scale.setScalar(1.8); const heat = add(sprite(GLOW, new THREE.Color(0xff7a30), .22)); heat.position.copy(q); fade(heat, heat.material, 500, u => { heat.material.opacity = (1 - u) * .9; heat.position.copy(m.position); }); }]], end: q => { impact(q, sev); fires(q, .1, 5); smokePlume(q, { h: 1.2 + sev * .12, w: .11, rate: 7, life: 6.5, col: 0x161310, glow: .85 }); ringPulse(q, 0xffe0b0, .9 + sev * .12, 1200, 1, 0); } });
+    if (i === 0) {
+      S.cineFollow = 1; controls.minDistance = 1.15;
+      const side = new THREE.Vector3(Math.cos(az), 0.55, Math.sin(az)).normalize();
+      scLoop(m, () => {
+        if (!S.cineFollow || !m.visible) return;
+        const pos = m.position.clone();
+        const camPos = pos.clone().addScaledVector(side, 1.55).add(new THREE.Vector3(0, .45, 0));
+        camera.position.lerp(camPos, .22); controls.target.lerp(pos, .28);
+      });
+    }
     if (intercept && i === n - 1) { const ic = missileMesh(.28, 0xcfd8e0); exhaustTrail(ic, { col: 0xdde4ee, w: .05, life: 900 }); const hitPt = arcF(s0, e, H)(.8); const s1 = e0.clone(); s1.y = Math.max(hAt(s1.x, s1.z), 0); fly(ic, arcF(s1, hitPt, .35), 1100, { delay: d0 + dur * .8 - 1100, end: q => { const f = add(sprite(GLOW, new THREE.Color(0xfff4d8), .4)); f.position.copy(q); fade(f, f.material, 800, u => { f.material.opacity = 1 - u; f.scale.setScalar(.4 + u * .7); }); sparks(q, 14, .55); } }); }
   }
   return last;
