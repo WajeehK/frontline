@@ -1885,7 +1885,7 @@ async function buildGlobe() {
   earth.onBeforeRender = () => { if (earth.material.uniforms && earth.material.uniforms.sunDir) earth.material.uniforms.sunDir.value.copy(globeSunView()); };
   GLOBE.earth = earth; root.add(earth);
   if (GLOBE.texClouds) {
-    const cmat = new THREE.MeshLambertMaterial({ map: GLOBE.texClouds, color: 0xffffff, transparent: true, opacity: .42, depthWrite: false });
+    const cmat = new THREE.MeshLambertMaterial({ alphaMap: GLOBE.texClouds, color: 0xffffff, transparent: true, opacity: .55, depthWrite: false });
     GLOBE.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.018, 64, 48), cmat); root.add(GLOBE.clouds);
   }
   const atmoMat = new THREE.ShaderMaterial({
@@ -1934,7 +1934,7 @@ function applyGlobeTheme(id) {
     GLOBE.earth.onBeforeRender = () => { if (GLOBE.earth.material.uniforms?.sunDir) GLOBE.earth.material.uniforms.sunDir.value.copy(globeSunView()); };
   }
   if (GLOBE.clouds) GLOBE.clouds.visible = th === 'realistic' || th === 'relief' || th === 'night';
-  if (GLOBE.clouds) GLOBE.clouds.material.opacity = th === 'night' ? .18 : .42;
+  if (GLOBE.clouds) GLOBE.clouds.material.opacity = th === 'night' ? .15 : .55;
   if (GLOBE.borders) GLOBE.borders.visible = th === 'political' || th === 'tactical';
   if (GLOBE.borders) GLOBE.borders.material.color.setHex(th === 'tactical' ? 0x7dffb4 : 0xd4e8ff);
   if (GLOBE.atmo && GLOBE.atmo.material.uniforms) GLOBE.atmo.material.uniforms.color.value.setHex(th === 'tactical' ? 0x3cff9a : th === 'thermal' ? 0xff6a3a : 0x7ec8ff);
