@@ -55,7 +55,7 @@
   var quick=(!force && (seen||reduce));
   if(quick){ i.classList.add('quick','stage-clear'); }
   var lines=[
-    'FRONTLINE SYS v13.0 — CLASSIFIED',
+    'FRONTLINE SYS v14.0 — CLASSIFIED',
     'loading cryptographic keys .............. OK',
     'opening one-time pad / AES-256 .......... OK',
     'establishing SATCOM uplink .............. OK',
@@ -152,6 +152,19 @@
 <div id="scFlash"></div><div id="scCap" aria-live="polite"></div><div id="scBar" aria-live="polite"><b>⚠ HYPOTHETICAL · SIMULATION</b><span id="scBarT"></span><button id="scBarX" aria-label="End simulation">✕</button></div>
 <div id="cine"><div class="lb lt"><span id="cineTag">HYPOTHETICAL · SIMULATION</span><b id="cineT"></b><button id="cineX" aria-label="End simulation">✕</button></div><div class="lb lbm"><div class="prog"><i id="cineP"></i></div></div></div>
 <aside id="opts" class="sheet glass" aria-label="Layers and alerts"><div class="grab"></div><div class="shead"><h2>Alerts & layers</h2></div><div id="optsBody" class="slist prose"></div></aside>
+<aside id="cineHud" class="cinehud" hidden>
+  <div class="ch-head"><span class="ch-live">● BREAKING</span><span id="chCount"></span></div>
+  <div class="ch-type" id="chType"></div>
+  <h2 id="chTitle"></h2>
+  <div class="ch-meta" id="chMeta"></div>
+  <div class="ch-sev" id="chSev"></div>
+  <div class="ch-actions">
+    <button type="button" id="chNext">Next ▸</button>
+    <button type="button" id="chSkip" class="ghost">Skip all</button>
+  </div>
+  <p class="ch-disc">Symbolic visual of a reported event, not a real trajectory or position.</p>
+</aside>
+<aside id="gCard" class="gcard glass" hidden></aside>
 <div id="brk" aria-live="assertive"></div>
 <article id="story" class="sheet glass" aria-label="Story" aria-modal="true"></article>
 <div id="stbar" class="stbar"></div>
@@ -160,7 +173,7 @@
 <aside id="about" class="sheet glass" aria-label="About">
  <div class="grab"></div>
  <div class="slist prose" id="aboutBody"></div>
- <p class="ver">Frontline v13 · imagery: Sentinel-2 cloudless by EOX (CC BY 4.0) · globe: NASA night lights (public domain) · terrain: AWS Terrain Tiles (Mapzen, open data)</p>
+ <p class="ver">Frontline v14 · imagery: Sentinel-2 cloudless by EOX (CC BY 4.0) · globe: NASA night lights (public domain) · terrain: AWS Terrain Tiles (Mapzen, open data)</p>
 </aside>
 
 <div id="thSheet" class="sheet glass small" role="listbox" aria-label="Choose conflict"><div class="grab"></div><div class="shead"><h2>Conflicts</h2></div><div id="thList" class="slist"></div></div>

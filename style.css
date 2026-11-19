@@ -722,3 +722,33 @@ body.globe #mode,body.globe .row3{display:none}
 #intro.stage-clear .bt-clearance{display:flex!important;opacity:1;visibility:visible}
 #intro.stage-lock .bt-lock{display:flex!important;opacity:1;visibility:visible}
 #intro.quick .bt-clearance{display:flex!important;opacity:1;visibility:visible}
+
+/* ---- v14 cinematic alert HUD (over the 3D scene, not a 2D diagram) ---- */
+.cinehud{position:fixed;z-index:60;left:10px;right:10px;bottom:calc(var(--dockH) + 10px + var(--safeB));padding:12px 14px 10px;border-radius:16px;background:rgba(6,8,10,.78);border:.5px solid rgba(255,255,255,.16);box-shadow:0 12px 40px rgba(0,0,0,.45);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);color:#fff;pointer-events:auto;transform:translate3d(0,20px,0);opacity:0;transition:transform .35s ease,opacity .35s ease}
+.cinehud.on{transform:none;opacity:1}
+.cinehud .ch-head{display:flex;justify-content:space-between;align-items:center;font-size:9px;font-weight:800;letter-spacing:.16em}
+.cinehud .ch-live{color:#ff5a3a;animation:lvbP 1.2s ease-in-out infinite}
+.cinehud #chCount{color:rgba(235,238,242,.55)}
+.cinehud .ch-type{margin-top:6px;font-size:10px;font-weight:800;letter-spacing:.16em;color:#ffb35c}
+.cinehud h2{margin:4px 0 6px;font-size:15px;line-height:1.3;font-weight:700}
+.cinehud .ch-meta{font-size:10.5px;color:rgba(235,238,242,.62)}
+.cinehud .ch-sev{margin-top:6px;display:flex;gap:4px;align-items:center;font-size:9px;letter-spacing:.1em;color:rgba(235,238,242,.5)}
+.cinehud .ch-sev i{width:10px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);display:inline-block}
+.cinehud .ch-sev i.on{background:#ff6a2b}
+.cinehud .ch-actions{display:flex;gap:8px;margin-top:10px}
+.cinehud .ch-actions button{flex:1;height:36px;border:0;border-radius:10px;background:#e8f0e8;color:#0a120e;font-weight:800;font-size:13px;letter-spacing:.04em;cursor:pointer}
+.cinehud .ch-actions button.ghost{background:rgba(255,255,255,.08);color:#fff;font-weight:650}
+.cinehud .ch-disc{margin:8px 0 0;font-size:9px;color:rgba(235,238,242,.42)}
+.cinehud[data-more="0"] #chNext{display:none}
+.cinehud[data-more="0"] #chSkip{display:none}
+@media (min-width:900px){.cinehud{left:16px;right:auto;width:440px;bottom:24px}}
+body.cine .cinehud{opacity:0;pointer-events:none}
+/* globe focus card */
+.gcard{position:fixed;z-index:40;left:10px;right:10px;bottom:calc(var(--dockH) + 14px + var(--safeB));padding:12px 14px;border-radius:16px;pointer-events:auto}
+.gcard b{display:block;font-size:14px}
+.gcard small{display:block;color:var(--dim);margin:3px 0 8px}
+.gcard .gcl{display:flex;gap:8px;flex-wrap:wrap}
+.gcard .gcl a,.gcard .gcl button{font-size:11px;font-weight:700;padding:6px 10px;border-radius:8px;border:.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;text-decoration:none;cursor:pointer}
+.gcard .gcl a.pri,.gcard .gcl button.pri{background:#d7ffe6;color:#06210f;border:0}
+body.globe #note{display:block;bottom:calc(var(--dockH) + 8px + var(--safeB))}
+@media (min-width:900px){.gcard{left:16px;right:auto;width:440px}}
