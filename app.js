@@ -213,6 +213,17 @@ function placeLabels() {
     if (show && !L.force) for (const r of placed) if (x < r[2] && x + L.w > r[0] && y < r[3] && y + L.h > r[1]) { show = false; break; }
     if (show) { placed.push([x - 3, y - 2, x + L.w + 3, y + L.h + 2]); L.el.style.transform = `translate3d(${x.toFixed(1)}px,${y.toFixed(1)}px,0)`; }
     const op = show ? (L.op ?? 1) : 0; if (L._op !== op) { L.el.style.opacity = op; L._op = op; }
+    if (L.leader && L.anchor) {
+      if (!L.leadEl) { L.leadEl = document.createElement('i'); L.leadEl.className = 'glead'; labelsEl.appendChild(L.leadEl); }
+      if (show) {
+        _v.copy(L.anchor).project(camera);
+        const ax = (_v.x * .5 + .5) * W, ay = (-_v.y * .5 + .5) * H;
+        const lx = x + L.w * (L.ax ?? .5), ly = y + L.h;
+        const dx = lx - ax, dy = ly - ay, len = Math.hypot(dx, dy), ang = Math.atan2(dy, dx);
+        L.leadEl.style.opacity = .7; L.leadEl.style.transform = `translate(${ax.toFixed(1)}px,${ay.toFixed(1)}px) rotate(${ang}rad)`;
+        L.leadEl.style.width = Math.max(0, len - 4).toFixed(1) + 'px';
+      } else if (L.leadEl) L.leadEl.style.opacity = 0;
+    }
   }
 }
 
@@ -433,7 +444,7 @@ function callout(e, P, tag) {
 function play(e, { fly = true } = {}) {
   if (!S.th) return;
   annotateEvent(e);
-  if (S.tid === 'globe' && e._tid && S.TH[e._tid]) { location.hash = 't=' + e._tid; loadTheatre(e._tid).then(() => setTimeout(() => play(e, { fly }), 450)); return; }
+  if (S.tid === 'globe' && e._tid && S.TH[e._tid]) { focusGlobeTheatre(e._tid, e); return; }
   const P = evPos(e), to = P.p; const sides = S.th.sides; const sc = e.actor === 'A' ? sides[0].color : e.actor === 'B' ? sides[1].color : '#ffb35c';
   const col = new THREE.Color(sc).getHex();
   let from = e.actor ? originFor(e.actor, to) : null;
@@ -536,7 +547,8 @@ function toLeads(d) { if (d.clusters) return d.clusters.map(c => ({ ...c, id: c.
 function groupClusters() { const m = new Map(); for (const e of S.events) { if (!m.has(e.cid)) m.set(e.cid, { lead: e, more: [] }); else m.get(e.cid).more.push(e); } return [...m.values()]; }
 function renderFeed() {
   const f = S.filter; const T = S.mode === 'scrub' ? S.T : Infinity;
-  const list = S.clusters.filter(c => c.lead.ts <= T).filter(c => f === 'all' || (f === 'kin' ? KIN.has(c.lead.type) : f === 'dip' ? c.lead.type === 'diplomacy' : !KIN.has(c.lead.type) && c.lead.type !== 'diplomacy'));
+  const list = S.clusters.filter(c => c.lead.ts <= T).filter(c => !S.gFocus || c.lead._tid === S.gFocus).filter(c => f === 'all' || (f === 'kin' ? KIN.has(c.lead.type) : f === 'dip' ? c.lead.type === 'diplomacy' : !KIN.has(c.lead.type) && c.lead.type !== 'diplomacy'));
+  const fh = document.querySelector('#feed .shead h2'); if (fh) fh.textContent = S.tid === 'globe' ? (S.gFocus && S.TH[S.gFocus] ? S.TH[S.gFocus].name + ' · feed' : 'Global feed') : 'Event feed';
   $('#feedList').innerHTML = list.length ? list.slice(0, 150).map(c => { const e = annotateEvent(c.lead); const [nm, ic, col] = typOf(e); const side = e.actor && S.th.sides[e.actor === 'A' ? 0 : 1] ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
     const thn = e._tid && S.TH[e._tid] ? esc(S.TH[e._tid].name) + ' · ' : '';
     const can = e.confirmed && e.anim && e.anim !== 'none';
@@ -546,7 +558,7 @@ function renderFeed() {
     ${(e.outlets || []).length > 1 ? `<details><summary>Covered by ${e.outlets.length} outlets: ${esc(e.outlets.map(o => o.outlet).join(', '))}</summary>${e.outlets.map(m => `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.outlet)} · ${hm(m.ts)} · ${esc(m.title)} ↗</a>`).join('')}</details>` : ''}</div>`; }).join('')
     : `<div class="empty">No reports in this filter yet. Data refreshes every ~15 minutes.</div>`;
 }
-$('#feedList').addEventListener('click', ev => { const card = ev.target.closest('.ev'); if (card && !ev.target.closest('button[data-id]') && !ev.target.closest('summary')) { ev.preventDefault(); const e = S.events.find(x => x.id === card.dataset.id); if (e) openStory(e); return; } const b = ev.target.closest('button[data-id]'); if (!b) return; const e = S.events.find(x => x.id === b.dataset.id); if (!e) return; S.userAt = -1e9; if (!DESK.matches) go(0); setTimeout(() => play(e), 250); });
+$('#feedList').addEventListener('click', ev => { const card = ev.target.closest('.ev'); if (card && !ev.target.closest('button[data-id]') && !ev.target.closest('summary')) { ev.preventDefault(); const e = S.events.find(x => x.id === card.dataset.id); if (e) openStory(e); return; } const b = ev.target.closest('button[data-id]'); if (!b) return; const e = S.events.find(x => x.id === b.dataset.id); if (!e) return; S.userAt = -1e9; if (S.tid === 'globe' && e._tid && S.TH[e._tid]) { location.hash = 't=' + e._tid; loadTheatre(e._tid).then(() => setTimeout(() => play(e), 280)); return; } if (!DESK.matches) go(0); setTimeout(() => play(e), 250); });
 document.querySelectorAll('.filters button').forEach(b => b.addEventListener('click', () => { S.filter = b.dataset.f; document.querySelectorAll('.filters button').forEach(x => x.classList.toggle('on', x === b)); renderFeed(); }));
 
 // ---------------------------------------------------------------- sequencing: loop recent reports, animate new ones live
@@ -778,7 +790,9 @@ function sw(id, on, dis) { return `<button class="sw ${on ? 'on' : ''}" data-sw=
 function renderOpts() {
   const el = $('#optsBody'); if (!el || !S.TH) return; const perm = 'Notification' in window ? Notification.permission : 'unsupported';
   const note = !pushOK() ? 'Push isn’t supported in this browser.' : perm === 'denied' ? 'Notifications are blocked for this site. Allow them in Chrome’s site settings.' : P.on ? `On. You’ll get major strikes, missile launches and escalation jumps for the conflicts ticked below, even when the app is closed. Max 4 an hour; quiet 00:30–07:30 UK unless severity 5. Delivered within ~15 min of a report.${P.synced ? ' Synced ' + hm(P.synced / 1000) + '.' : ''}` : 'Get notified about major events even when the app is closed.';
-  el.innerHTML = `<h3>MAP STYLE</h3><div class="stygrid">${STYLES.map(([id, nm, c]) => `<button class="sty${id === STY ? ' on' : ''}" data-sw="sty:${id}"><i class="sw-${id}" style="background:${c}"></i><span>${nm}</span></button>`).join('')}</div>
+  const GTHEMES = [['realistic', 'Realistic', '#6a8aaa'], ['night', 'Night lights', '#1a2040'], ['tactical', 'Tactical', '#1f6a2a'], ['political', 'Political', '#3a5a9a'], ['relief', 'Terrain / Relief', '#8a7350'], ['thermal', 'Thermal', '#d8602a']];
+  const globeLooks = GLOBE.on ? `<h3>GLOBE LOOK</h3><div class="stygrid">${GTHEMES.map(([id, nm, c]) => `<button class="sty${(GLOBE.theme || 'realistic') === id ? ' on' : ''}" data-sw="gthy:${id}"><i style="background:${c}"></i><span>${nm}</span></button>`).join('')}</div>` : '';
+  el.innerHTML = `${globeLooks}${GLOBE.on ? '' : `<h3>MAP STYLE</h3><div class="stygrid">${STYLES.map(([id, nm, c]) => `<button class="sty${id === STY ? ' on' : ''}" data-sw="sty:${id}"><i class="sw-${id}" style="background:${c}"></i><span>${nm}</span></button>`).join('')}</div>`}
    <h3>ALERTS</h3><div class="orow"><span><b>Push alerts</b><small>${note}</small></span>${sw('push', P.on, !pushOK() || perm === 'denied')}</div>
    ${Object.entries(S.TH).map(([id, t]) => `<div class="orow sub ${P.on ? '' : 'dim'}"><span>${esc(t.name)}</span>${sw('th:' + id, P.th.includes(id), !P.on)}</div>`).join('')}
    <div class="orow sub ${P.on ? '' : 'dim'}"><span>Escalation jumps (meter reaches High or Severe)</span>${sw('esc', P.esc, !P.on)}</div>
@@ -797,6 +811,7 @@ $('#opts').addEventListener('click', async e => {
   if (k === 'push') { P.on ? await pushOff() : await pushOn(); return; }
   if (k.startsWith('th:')) { const id = k.slice(3); P.th = P.th.includes(id) ? P.th.filter(x => x !== id) : [...P.th, id]; saveP(); renderOpts(); pushSync(true).catch(() => { }); return; }
   if (k === 'esc') { P.esc = !P.esc; saveP(); renderOpts(); pushSync(true).catch(() => { }); return; }
+  if (k.startsWith('gthy:')) { applyGlobeTheme(k.slice(5)); renderOpts(); return; }
   if (k.startsWith('sty:')) { applyStyle(k.slice(4)); renderOpts(); return; }
   if (k.startsWith('lay:')) { const id = k.slice(4); LAY[id] = !LAY[id]; applyLayers(); renderOpts(); }
 });
@@ -1367,7 +1382,7 @@ async function loadTheatre(tid) {
     return;
   }
   document.body.classList.remove('globe'); restoreTheatreControls();
-  if (S._hudPreGlobe === false) setHud(false, false); S._hudPreGlobe = null;
+  if (S._hudPreGlobe === false) setHud(false, false); S._hudPreGlobe = null; S.gFocus = null; GLOBE.focus = null; const gc = $('#gCard'); if (gc) gc.hidden = true;
   S.tid = tid; S.th = S.TH[tid]; localStorage.setItem('fl_t', tid);
   $('#thName').textContent = S.th.name; document.body.classList.toggle('tension', S.th.kind === 'tension'); $('#thName').dataset.k = S.th.kind === 'tension' ? 'TENSIONS' : ''; $('#sideA').textContent = S.th.sides[0].short; $('#sideB').textContent = S.th.sides[1].short;
   document.documentElement.style.setProperty('--A', S.th.sides[0].color); document.documentElement.style.setProperty('--B', S.th.sides[1].color);
@@ -1751,7 +1766,7 @@ function frame(now) {
   for (const a of assets) { const s = 1 + .25 * Math.sin(now / 700 + a.phase); a.ring.scale.setScalar(.09 * s); a.gl.material.opacity = .6 + .3 * Math.sin(now / 500 + a.phase);
     if (a.ping) { const u = ((now / 1000 + a.phase) % 3.2) / 3.2; a.ping.scale.setScalar(.06 + u * .34); a.ping.material.opacity = (1 - u) ** 2 * .5; } }
   if (motes.visible) { motes.rotation.y = now / 90000; motes.position.y = Math.sin(now / 4000) * .05; }
-  if (GLOBE.on) { const tt = now / 1000; GLOBE.hot.forEach(o => { if (!o.userData.pulse) return; const u = (tt % 2.4) / 2.4; o.scale.setScalar(1 + u * 0.9); if (o.material) o.material.opacity = (1 - u) * (1 - u) * .7; }); }
+  if (GLOBE.on) { const tt = now / 1000; if (GLOBE.clouds && GLOBE.clouds.visible) GLOBE.clouds.rotation.y += dt * .012; GLOBE.hot.forEach(o => { if (!o.userData.pulse) return; const u = (tt % 2.4) / 2.4; const mag = o.userData.fresh ? 1.6 : 0.9; o.scale.setScalar(1 + u * mag); if (o.material) o.material.opacity = (1 - u) * (1 - u) * (o.userData.fresh ? .95 : .7); }); }
   if (S.rise != null) { const u = Math.min(1, (now - S.rise) / 1300); world.scale.y = .02 + .98 * (1 - (1 - u) ** 3); if (u >= 1) S.rise = null; }
   camera.position.sub(_shk);
   const idle = performance.now() - S.userAt > 15000;
@@ -1794,7 +1809,7 @@ const ANIM_TY = {
 };
 const tagOf = e => { annotateEvent(e); return (e.anim && ANIM_TY[e.anim]) || TY[e.type] || TY.statement; };
 const GLOBE_TH = { name: 'Globe', kind: 'globe', bbox: [-180, -85, 180, 85], zoom: 1, sides: [{ id: 'A', name: 'World', short: 'WORLD', color: '#4da3ff' }, { id: 'B', name: '', short: '', color: '#8fffc4' }], assets: [], labels: [], focus: [20, 35] };
-const GLOBE = { on: false, root: null, earth: null, hot: [], marks: [], stars: null, tex: null };
+const GLOBE = { on: false, root: null, earth: null, hot: [], marks: [], stars: null, tex: null, theme: localStorage.getItem('fl_globe_theme') || 'realistic', clouds: null, borders: null, focus: null };
 const TH_CTRL = { minDistance: 2.5, maxDistance: 30, maxPolarAngle: 1.25, minPolarAngle: 0.12, enablePan: true,
   mouseButtons: { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE },
   touches: { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE } };
@@ -1820,62 +1835,135 @@ function restoreTheatreControls() {
   controls.minPolarAngle = TH_CTRL.minPolarAngle; controls.maxPolarAngle = TH_CTRL.maxPolarAngle;
   controls.mouseButtons = TH_CTRL.mouseButtons; controls.touches = TH_CTRL.touches;
 }
+function loadGlobeTex(url) {
+  return new Promise(res => new THREE.TextureLoader().load(url, t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.ClampToEdgeWrapping; res(t); }, undefined, () => res(null)));
+}
+function globeSunView() { const w = new THREE.Vector3(.85, .28, .45).normalize(); return w.transformDirection(camera.matrixWorldInverse); }
+function makeGlobeShader(theme) {
+  const th = theme === 'night' ? 1 : theme === 'thermal' ? 5 : theme === 'relief' ? 4 : 0;
+  return new THREE.ShaderMaterial({
+    uniforms: { dayMap: { value: GLOBE.texDay }, nightMap: { value: GLOBE.texNight }, specMap: { value: GLOBE.texSpec }, sunDir: { value: new THREE.Vector3(.6, .3, .4) }, theme: { value: th } },
+    vertexShader: 'varying vec2 vUv;varying vec3 vN;varying vec3 vPos;void main(){vUv=uv;vN=normalize(normalMatrix*normal);vec4 p=modelViewMatrix*vec4(position,1.0);vPos=p.xyz;gl_Position=projectionMatrix*p;}',
+    fragmentShader: `uniform sampler2D dayMap;uniform sampler2D nightMap;uniform sampler2D specMap;uniform vec3 sunDir;uniform float theme;
+      varying vec2 vUv;varying vec3 vN;varying vec3 vPos;
+      void main(){
+        vec3 day=texture2D(dayMap,vUv).rgb; vec3 night=texture2D(nightMap,vUv).rgb; float water=texture2D(specMap,vUv).r;
+        vec3 n=normalize(vN); vec3 L=normalize(sunDir); float ndl=dot(n,L); float lit=smoothstep(-0.12,0.22,ndl);
+        vec3 cities=night*night*vec3(1.6,1.45,1.1);
+        vec3 col;
+        if(theme>0.5&&theme<1.5){ col=night*0.28+cities*1.7+day*lit*0.12; }
+        else if(theme>4.5){ float l=dot(day,vec3(.25,.5,.25)); col=mix(vec3(.03,.0,.06),vec3(.45,.08,.02),l); col+=cities*0.4; }
+        else { col=mix(cities*1.15, day*(theme>3.5?1.12:1.0), lit); }
+        vec3 V=normalize(-vPos); vec3 R=reflect(-L,n); float spec=pow(max(0.0,dot(R,V)),22.0)*water*lit;
+        col+=vec3(0.7,0.85,1.0)*spec*0.6;
+        gl_FragColor=vec4(col,1.0);
+      }`
+  });
+}
 function disposeGlobe() {
-  GLOBE.on = false; GLOBE.hot = []; GLOBE.marks = [];
+  GLOBE.on = false; GLOBE.hot = []; GLOBE.marks = []; GLOBE.clouds = null; GLOBE.borders = null;
+  labels.forEach(l => { if (l.globe) { l.dead = true; l.el.remove(); l.leadEl?.remove(); } }); labels = labels.filter(l => !l.globe);
   if (GLOBE.stars) { scene.remove(GLOBE.stars); GLOBE.stars.geometry.dispose(); GLOBE.stars.material.dispose(); GLOBE.stars = null; }
-  if (GLOBE.root) { scene.remove(GLOBE.root); GLOBE.root.traverse(o => { o.geometry?.dispose?.(); if (o.material) { const ms = [].concat(o.material); ms.forEach(m => { if (m.map && m.map !== GLOBE.tex) m.map.dispose?.(); m.dispose?.(); }); } }); GLOBE.root = null; GLOBE.earth = null; }
+  if (GLOBE.root) { scene.remove(GLOBE.root); GLOBE.root.traverse(o => { o.geometry?.dispose?.(); if (o.material) { const ms = [].concat(o.material); ms.forEach(m => { const maps = [m.map, m.emissiveMap, m.specularMap]; const keep = new Set([GLOBE.tex, GLOBE.texDay, GLOBE.texNight, GLOBE.texSpec, GLOBE.texClouds]); maps.forEach(mp => { if (mp && !keep.has(mp)) mp.dispose?.(); }); m.dispose?.(); }); } }); GLOBE.root = null; GLOBE.earth = null; }
   scene.background = new THREE.Color(0x000000);
 }
 async function buildGlobe() {
   disposeGlobe();
   const root = new THREE.Group(); GLOBE.root = root; GLOBE.on = true;
-  if (!GLOBE.tex) {
-    GLOBE.tex = await new Promise((res, rej) => new THREE.TextureLoader().load('geo/earth.jpg', t => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy()); res(t); }, undefined, rej));
-  }
-  if (GLOBE.tex) { GLOBE.tex.wrapS = THREE.RepeatWrapping; GLOBE.tex.wrapT = THREE.ClampToEdgeWrapping; GLOBE.tex.needsUpdate = true; }
-  const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), new THREE.MeshPhongMaterial({
-    map: GLOBE.tex, color: 0xffffff,
-    emissive: new THREE.Color(0x0c2018), emissiveMap: GLOBE.tex, emissiveIntensity: .5,
-    shininess: 14, specular: new THREE.Color(0x15202a)
-  }));
+  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const load = async (key, url) => { if (!GLOBE[key]) GLOBE[key] = await loadGlobeTex(url); return GLOBE[key]; };
+  await Promise.all([
+    load('texDay', 'geo/earth-day.jpg'),
+    load('texNight', 'geo/earth-night.jpg'),
+    load('texSpec', 'geo/earth-spec.jpg'),
+    load('texClouds', 'geo/earth-clouds.jpg'),
+    load('tex', 'geo/earth.jpg')
+  ]);
+  if (GLOBE.tex) { GLOBE.tex.wrapS = THREE.RepeatWrapping; GLOBE.tex.wrapT = THREE.ClampToEdgeWrapping; }
+  const earth = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 64), makeGlobeShader('realistic'));
+  earth.onBeforeRender = () => { if (earth.material.uniforms && earth.material.uniforms.sunDir) earth.material.uniforms.sunDir.value.copy(globeSunView()); };
   GLOBE.earth = earth; root.add(earth);
+  if (GLOBE.texClouds) {
+    const cmat = new THREE.MeshLambertMaterial({ map: GLOBE.texClouds, color: 0xffffff, transparent: true, opacity: .42, depthWrite: false });
+    GLOBE.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.018, 64, 48), cmat); root.add(GLOBE.clouds);
+  }
   const atmoMat = new THREE.ShaderMaterial({
-    uniforms: { color: { value: new THREE.Color(0x7ee8ff) } },
+    uniforms: { color: { value: new THREE.Color(0x7ec8ff) } },
     vertexShader: 'varying vec3 vN;varying vec3 vV;void main(){vec4 p=modelViewMatrix*vec4(position,1.0);vN=normalize(normalMatrix*normal);vV=normalize(-p.xyz);gl_Position=projectionMatrix*p;}',
-    fragmentShader: 'uniform vec3 color;varying vec3 vN;varying vec3 vV;void main(){float f=pow(1.0-abs(dot(normalize(vN),normalize(vV))),3.1);gl_FragColor=vec4(color,f*1.05);}',
+    fragmentShader: 'uniform vec3 color;varying vec3 vN;varying vec3 vV;void main(){float f=pow(1.0-abs(dot(normalize(vN),normalize(vV))),3.0);gl_FragColor=vec4(color,f*1.1);}',
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide
   });
-  root.add(new THREE.Mesh(new THREE.SphereGeometry(1.085, 64, 48), atmoMat));
-  root.add(new THREE.Mesh(new THREE.SphereGeometry(1.02, 64, 48), new THREE.MeshBasicMaterial({ color: 0xa8ffe0, transparent: true, opacity: .07, depthWrite: false, blending: THREE.AdditiveBlending })));
-  const N = 1400, pos = new Float32Array(N * 3);
+  GLOBE.atmo = new THREE.Mesh(new THREE.SphereGeometry(1.09, 64, 48), atmoMat); root.add(GLOBE.atmo);
+  root.add(new THREE.Mesh(new THREE.SphereGeometry(1.022, 64, 48), new THREE.MeshBasicMaterial({ color: 0xa8dfff, transparent: true, opacity: .07, depthWrite: false, blending: THREE.AdditiveBlending })));
+  const N = 1600, pos = new Float32Array(N * 3);
   for (let i = 0; i < N; i++) { const r = 18 + Math.random() * 40, p = Math.acos(2 * Math.random() - 1), t = Math.random() * 6.283; pos[i * 3] = r * Math.sin(p) * Math.cos(t); pos[i * 3 + 1] = r * Math.cos(p); pos[i * 3 + 2] = r * Math.sin(p) * Math.sin(t); }
   const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  GLOBE.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xd8ecff, size: .055, sizeAttenuation: true, transparent: true, opacity: .9 }));
+  GLOBE.stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xd8ecff, size: .06, sizeAttenuation: true, transparent: true, opacity: .92 }));
   scene.add(GLOBE.stars);
+  // political borders as line segments on the sphere
+  try {
+    const raw = await getJSON('geo/borders-110m.json');
+    const pts = [];
+    for (const line of raw) {
+      for (let i = 0; i + 1 < line.length; i++) {
+        const a = llVec(line[i][1], line[i][0], 1.004), b = llVec(line[i + 1][1], line[i + 1][0], 1.004);
+        pts.push(a.x, a.y, a.z, b.x, b.y, b.z);
+      }
+    }
+    const bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    GLOBE.borders = new THREE.LineSegments(bg, new THREE.LineBasicMaterial({ color: 0xcfe6ff, transparent: true, opacity: .85 }));
+    GLOBE.borders.visible = false; root.add(GLOBE.borders);
+  } catch (_) { }
   scene.add(root);
   scene.background = new THREE.Color(0x000000);
+  applyGlobeTheme(GLOBE.theme || 'realistic');
+}
+function applyGlobeTheme(id) {
+  const ok = ['realistic', 'night', 'tactical', 'political', 'relief', 'thermal'];
+  GLOBE.theme = ok.includes(id) ? id : 'realistic';
+  localStorage.setItem('fl_globe_theme', GLOBE.theme);
+  if (!GLOBE.earth) return;
+  const th = GLOBE.theme;
+  if (th === 'tactical') {
+    GLOBE.earth.material = new THREE.MeshPhongMaterial({ map: GLOBE.tex, color: 0xffffff, emissive: new THREE.Color(0x0c2018), emissiveMap: GLOBE.tex, emissiveIntensity: .55, shininess: 10, specular: new THREE.Color(0x15202a) });
+  } else if (th === 'political') {
+    GLOBE.earth.material = new THREE.MeshPhongMaterial({ color: 0x0c1a28, emissive: new THREE.Color(0x071018), shininess: 8, specular: new THREE.Color(0x102030) });
+  } else {
+    GLOBE.earth.material = makeGlobeShader(th);
+    GLOBE.earth.onBeforeRender = () => { if (GLOBE.earth.material.uniforms?.sunDir) GLOBE.earth.material.uniforms.sunDir.value.copy(globeSunView()); };
+  }
+  if (GLOBE.clouds) GLOBE.clouds.visible = th === 'realistic' || th === 'relief' || th === 'night';
+  if (GLOBE.clouds) GLOBE.clouds.material.opacity = th === 'night' ? .18 : .42;
+  if (GLOBE.borders) GLOBE.borders.visible = th === 'political' || th === 'tactical';
+  if (GLOBE.borders) GLOBE.borders.material.color.setHex(th === 'tactical' ? 0x7dffb4 : 0xd4e8ff);
+  if (GLOBE.atmo && GLOBE.atmo.material.uniforms) GLOBE.atmo.material.uniforms.color.value.setHex(th === 'tactical' ? 0x3cff9a : th === 'thermal' ? 0xff6a3a : 0x7ec8ff);
+  plotGlobeHotspots();
 }
 function plotGlobeHotspots() {
   if (!GLOBE.on || !GLOBE.root) return;
   GLOBE.hot.forEach(o => { GLOBE.root.remove(o); o.geometry?.dispose?.(); o.material?.dispose?.(); });
-  GLOBE.hot = []; labels.forEach(l => { if (l.globe) { l.dead = true; l.el.remove(); } }); labels = labels.filter(l => !l.globe);
+  GLOBE.hot = []; labels.forEach(l => { if (l.globe) { l.dead = true; l.el.remove(); l.leadEl?.remove(); } }); labels = labels.filter(l => !l.globe);
   const ix = ((S.index && S.index.theatres) || []);
+  const thermal = GLOBE.theme === 'thermal';
   for (const [id, th] of Object.entries(S.TH)) {
     const info = ix.find(t => t.id === id) || {};
     const p = llVec(th.focus[0], th.focus[1], 1.035);
-    const col = new THREE.Color(info.esc24 >= 60 ? 0xff5a3a : info.esc24 >= 35 ? 0xff9a2b : 0x3cff9a);
+    const hotCol = info.esc24 >= 60 ? 0xff5a3a : info.esc24 >= 35 ? 0xff9a2b : 0x3cff9a;
+    const col = new THREE.Color(hotCol);
     const m = new THREE.Mesh(new THREE.SphereGeometry(.028, 16, 12), new THREE.MeshBasicMaterial({ color: col }));
     m.position.copy(p); m.userData = { tid: id, kind: 'hot' }; GLOBE.root.add(m); GLOBE.hot.push(m);
     const ring = new THREE.Mesh(new THREE.RingGeometry(.042, .058, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: .9, depthWrite: false }));
-    ring.position.copy(p); ring.lookAt(0, 0, 0); ring.userData = { tid: id, kind: 'hot' }; GLOBE.root.add(ring); GLOBE.hot.push(ring);
+    ring.position.copy(p); ring.lookAt(0, 0, 0); ring.userData = { tid: id, kind: 'hot', focusRing: 1 }; GLOBE.root.add(ring); GLOBE.hot.push(ring);
     const ping = new THREE.Mesh(new THREE.RingGeometry(.045, .05, 32), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide, transparent: true, opacity: .65, depthWrite: false }));
     ping.position.copy(p); ping.lookAt(0, 0, 0); ping.userData = { pulse: 1, tid: id }; GLOBE.root.add(ping); GLOBE.hot.push(ping);
-    const n24 = info.n24 || 0;
+    if (thermal || (info.esc24 || 0) >= 35) {
+      const heat = new THREE.Mesh(new THREE.SphereGeometry(.12 + (info.esc24 || 0) / 400, 16, 12), new THREE.MeshBasicMaterial({ color: hotCol, transparent: true, opacity: thermal ? .45 : .12, depthWrite: false, blending: THREE.AdditiveBlending }));
+      heat.position.copy(p); heat.userData = { tid: id, kind: 'hot' }; GLOBE.root.add(heat); GLOBE.hot.push(heat);
+    }
     const gname = { 'us-iran': 'US–Iran', 'israel-gaza-lebanon': 'Israel–Gaza', 'russia-ukraine': 'Russia–Ukraine', 'yemen-red-sea': 'Yemen', 'pakistan-india': 'Pakistan–India', 'china-taiwan': 'China–Taiwan', 'koreas': 'Koreas' }[id] || th.name;
     const off = { 'israel-gaza-lebanon': [10, -18], 'yemen-red-sea': [-10, -4], 'us-iran': [1, 8], 'pakistan-india': [-12, 4], 'russia-ukraine': [6, -4] }[id] || [0, 0];
-    addLabel(`<b>${esc(gname)}</b>`, 'gl', llVec(th.focus[0] + off[0], th.focus[1] + off[1], 1.16), 12, { ay: 1, globe: true, force: true, maxD: 16 });
+    addLabel(`<b>${esc(gname)}</b>`, 'gl', llVec(th.focus[0] + off[0], th.focus[1] + off[1], 1.16), 12, { ay: 1, globe: true, force: true, maxD: 16, leader: true, anchor: p.clone() });
   }
-  // recent confirmed events as smaller dots
   const now = Date.now() / 1000;
   for (const e of S.events) {
     annotateEvent(e);
@@ -1883,8 +1971,27 @@ function plotGlobeHotspots() {
     const p = llVec(e.loc.lat, e.loc.lon, 1.02);
     const col = new THREE.Color((tagOf(e)[2]) || '#ff9a3c');
     const d = new THREE.Mesh(new THREE.SphereGeometry(.008, 8, 8), new THREE.MeshBasicMaterial({ color: col }));
-    d.position.copy(p); d.userData = { tid: e._tid, kind: 'evt', id: e.id }; GLOBE.root.add(d); GLOBE.hot.push(d);
+    const fresh = now - e.ts < 2 * 3600;
+    d.position.copy(p); d.userData = { tid: e._tid, kind: 'evt', id: e.id, pulse: fresh ? 1 : 0, fresh: fresh ? 1 : 0 }; GLOBE.root.add(d); GLOBE.hot.push(d);
   }
+  if (GLOBE.focus) highlightGlobeFocus();
+}
+function highlightGlobeFocus() {
+  const tid = GLOBE.focus; if (!tid) return;
+  GLOBE.hot.forEach(o => { if (o.userData && o.userData.focusRing && o.userData.tid === tid) { o.scale.setScalar(1.8); if (o.material) o.material.opacity = 1; } });
+}
+function focusGlobeTheatre(tid, ev) {
+  if (!S.TH[tid]) return;
+  GLOBE.focus = tid; S.gFocus = tid;
+  highlightGlobeFocus();
+  const th = S.TH[tid]; const info = ((S.index && S.index.theatres) || []).find(t => t.id === tid) || {};
+  const card = $('#gCard'); if (card) {
+    const items = S.events.filter(e => e._tid === tid).slice(0, 3);
+    card.hidden = false; card.innerHTML = `<b>${esc(th.name)}</b><small>${info.n24 || 0} reports in 24h${info.esc24 != null ? ' · esc ' + info.esc24 : ''}</small>${items.map(e => `<div class="gitem">${esc(e.title)}</div>`).join('')}<div class="gcl"><button type="button" class="pri" data-open-th="${esc(tid)}">Open theatre</button><button type="button" data-gclear="1">Clear</button></div>`;
+    card.onclick = e => { const o = e.target.closest('[data-open-th]'); if (o) { location.hash = 't=' + o.dataset.openTh; loadTheatre(o.dataset.openTh); return; } if (e.target.closest('[data-gclear]')) { GLOBE.focus = null; S.gFocus = null; card.hidden = true; renderFeed(); } };
+  }
+  if (ev) { const el = document.querySelector(`#feedList .ev[data-id="${CSS.escape(ev.id)}"]`); el?.scrollIntoView({ block: 'nearest' }); }
+  renderFeed();
 }
 function homeCamGlobe() {
   setGlobeControls();
@@ -1906,12 +2013,10 @@ function globePick(ev) {
   const tid = hit.object.userData.tid;
   if (hit.object.userData.kind === 'evt' && hit.object.userData.id) {
     const e = S.events.find(x => x.id === hit.object.userData.id);
-    if (e && e._tid) { location.hash = 't=' + e._tid; loadTheatre(e._tid).then(() => setTimeout(() => play(e), 450)); return; }
+    if (e) { focusGlobeTheatre(e._tid || tid, e); return; }
   }
-  if (tid && S.TH[tid]) { location.hash = 't=' + tid; loadTheatre(tid); }
+  if (tid && S.TH[tid]) focusGlobeTheatre(tid);
 }
-(() => { let p0 = null; canvas.addEventListener('pointerdown', e => { p0 = { x: e.clientX, y: e.clientY }; });
-  canvas.addEventListener('pointerup', e => { if (!p0) return; const d = Math.hypot(e.clientX - p0.x, e.clientY - p0.y); p0 = null; if (d > 10) return; globePick(e); }); })();
 
 function renderFresh() {
   const t = S.index && S.index.updated, el = $('#liveTag'), fr = $('#feedFresh');
@@ -2114,7 +2219,7 @@ async function init() {
   setInterval(poll, 60000); setInterval(() => { if (document.visibilityState === 'visible') pollFast(); }, 60000); setInterval(renderFresh, 30000); renderFresh();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { poll(); pollFast(); } });
   $('#mkt').addEventListener('click', () => $('#mkt').classList.toggle('paused'));
-window.__fl = { runScen, openScen, endScen, loadScen, SC, S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground, loadTheatre, annotateEvent, GLOBE, liveEvent, camera, controls, startAlertQueue, nextAlert, skipAllAlerts, showAlertAt, cineBallistic, applyStyle };
+window.__fl = { runScen, openScen, endScen, loadScen, SC, S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground, loadTheatre, annotateEvent, GLOBE, liveEvent, camera, controls, startAlertQueue, nextAlert, skipAllAlerts, showAlertAt, cineBallistic, applyStyle, applyGlobeTheme, focusGlobeTheatre };
 }
 init().catch(err => { $('#boot span').textContent = 'Could not start: ' + err.message; console.error(err); });
 
