@@ -588,7 +588,7 @@ function renderFeed() {
     ${(e.outlets || []).length > 1 ? `<details><summary>Covered by ${e.outlets.length} outlets: ${esc(e.outlets.map(o => o.outlet).join(', '))}</summary>${e.outlets.map(m => `<a href="${esc(m.url)}" target="_blank" rel="noopener">${esc(m.outlet)} · ${hm(m.ts)} · ${esc(m.title)} ↗</a>`).join('')}</details>` : ''}</div>`; }).join('')
     : `<div class="empty">No reports in this filter yet. Data refreshes every ~15 minutes.</div>`;
 }
-$('#feedList').addEventListener('click', ev => { const card = ev.target.closest('.ev'); if (card && !ev.target.closest('button[data-id]') && !ev.target.closest('summary')) { ev.preventDefault(); const e = S.events.find(x => x.id === card.dataset.id); if (e) openStory(e); return; } const b = ev.target.closest('button[data-id]'); if (!b) return; const e = S.events.find(x => x.id === b.dataset.id); if (!e) return; S.userAt = -1e9; if (S.tid === 'globe' && e._tid && S.TH[e._tid]) { location.hash = 't=' + e._tid; loadTheatre(e._tid).then(() => setTimeout(() => play(e), 280)); return; } if (!DESK.matches) go(0); setTimeout(() => play(e), 250); });
+$('#feedList').addEventListener('click', ev => { const card = ev.target.closest('.ev'); if (card && !ev.target.closest('button[data-id]') && !ev.target.closest('summary')) { ev.preventDefault(); const e = S.events.find(x => x.id === card.dataset.id); if (e) openStory(e); return; } const b = ev.target.closest('button[data-id]'); if (!b) return; const e = S.events.find(x => x.id === b.dataset.id); if (!e) return; S.userAt = -1e9; if (S.tid === 'globe' && e._tid && S.TH[e._tid]) { location.hash = 't=' + e._tid; loadTheatre(e._tid).then(() => setTimeout(() => playUser(e), 280)); return; } if (!DESK.matches) go(0); setTimeout(() => playUser(e), 250); });
 document.querySelectorAll('.filters button').forEach(b => b.addEventListener('click', () => { S.filter = b.dataset.f; document.querySelectorAll('.filters button').forEach(x => x.classList.toggle('on', x === b)); renderFeed(); }));
 
 // ---------------------------------------------------------------- sequencing: loop recent reports, animate new ones live
@@ -1139,6 +1139,7 @@ function startAlertQueue() {
   const kick = () => { if (document.getElementById('intro') || document.getElementById('boot') && !$('#boot')?.classList.contains('gone')) { setTimeout(kick, 280); return; } showAlertAt(0); };
   kick();
 }
+function playUser(e) { if (!e) return; annotateEvent(e); if (!clipOf(e)) { play(e); return; } S.brkAll = [e]; S.brkQ = []; S.brkI = 0; S.brkTotal = 1; S.alertHold = true; S.nextAt = 1e12; showAlertAt(0); }
 function showAlertAt(i) {
   if (i < 0) return;
   if (i >= (S.brkAll || []).length) { skipAllAlerts(); return; }
@@ -1960,7 +1961,7 @@ function closeStory() { if (history.state && history.state.story) history.back()
 addEventListener('popstate', ev => { const id = ev.state && ev.state.story; if (id) { const e = S.events.find(x => x.id === id); if (e) openStory(e, false); } else if (storyOpen) hideStory(); });
 const storyClick = ev => {
   if (ev.target.closest('.stx')) { closeStory(); return; }
-  if (ev.target.closest('.stfly')) { const e = storyOpen; closeStory(); setTimeout(() => { S.userAt = -1e9; go(0); play(e); }, 320); return; }
+  if (ev.target.closest('.stfly')) { const e = storyOpen; closeStory(); setTimeout(() => { S.userAt = -1e9; go(0); playUser(e); }, 320); return; }
   const r = ev.target.closest('.strel'); if (r) { const e = S.events.find(x => x.id === r.dataset.id); if (e) openStory(e, false); }
 };
 $('#story').addEventListener('click', storyClick); $('#stbar').addEventListener('click', storyClick);
@@ -2012,7 +2013,7 @@ $('#sidesBody').addEventListener('click', ev => {
     if (!open) { r.dataset.k = key; r.querySelector('.sbd>div').innerHTML = `<div class="sbdh">${c.dataset.side === '-' ? 'Unattributed attacks' : esc(S.th.sides[c.dataset.side === 'A' ? 0 : 1].name)} · ${esc(r.querySelector('.sbl').textContent)} · last 7 days</div>` + sbList(c.dataset.row, c.dataset.side); r.classList.add('open'); c.classList.add('sel'); setTimeout(() => r.scrollIntoView({ block: 'nearest', behavior: RMQ.matches ? 'auto' : 'smooth' }), 120); }
     return; }
   const o = ev.target.closest('.sbo'); if (o) { openStory(S.events.find(x => x.id === o.dataset.id)); return; }
-  const f = ev.target.closest('.sbf'); if (f) { const e = S.events.find(x => x.id === f.dataset.id); if (e) { S.userAt = -1e9; go(0); setTimeout(() => play(e), 250); } }
+  const f = ev.target.closest('.sbf'); if (f) { const e = S.events.find(x => x.id === f.dataset.id); if (e) { S.userAt = -1e9; go(0); setTimeout(() => playUser(e), 250); } }
 });
 
 
@@ -2035,7 +2036,7 @@ function miniBreaking(e) {
   b.innerHTML = `<span class="bmk" style="background:${col}">${ic} BREAKING · ${esc(nm)}</span><b>${esc(e.title)}</b><small>${esc(e.outlet)} · ${ago(e.ts)} · tap to read</small>`;
   b.onclick = () => { b.classList.remove('on'); openStory(e); };
   b.classList.remove('on'); void b.offsetWidth; b.classList.add('on'); clearTimeout(b._t); b._t = setTimeout(() => b.classList.remove('on'), 6500);
-  S.userAt = -1e9; play(e);
+  S.userAt = -1e9; playUser(e);
 }
 setHud(localStorage.getItem('fl_hudc') === '1', false);
 
