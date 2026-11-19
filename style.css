@@ -731,8 +731,8 @@ body.globe #mode,body.globe .row3{display:none}
 /* ---- v14 cinematic alert HUD (over the 3D scene, not a 2D diagram) ---- */
 .vahud{position:fixed;inset:0;z-index:80;background:#050505;color:#fff;pointer-events:auto;opacity:0;transition:opacity .28s ease}
 .vahud.on{opacity:1}
-.vahud video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#050505}
-.vahud.novid video{display:none}
+.vahud canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#050505}
+.vahud.novid canvas{display:none}
 .va-shade{position:absolute;left:0;right:0;pointer-events:none}
 .va-top{top:0;height:28%;background:linear-gradient(to bottom,rgba(0,0,0,.82) 0%,rgba(0,0,0,.45) 55%,transparent)}
 .va-bot{bottom:0;height:42%;background:linear-gradient(to top,rgba(0,0,0,.94) 0%,rgba(0,0,0,.72) 45%,transparent)}

@@ -38,7 +38,7 @@ CASES = [
     ("Houthi fighters boarded and seized a commercial vessel", "seizure"),
 
     ("Ballistic missile strikes a base in Erbil", "missile"),
-    ("Russia launched a barrage of missiles at Kyiv", "missile"),
+    ("Russia launched a barrage of missiles at Kyiv", "barrage"),
     ("Rockets hit a town in northern Israel", "missile"),
 
     ("US airstrike hits an IRGC facility near Kermanshah", "air"),
@@ -65,6 +65,21 @@ CASES = [
 
     ("Explosion at an army ammunition depot near Isfahan", "facility"),
     ("Missile strike destroys a radar site in Bahrain", "missile"),
+
+    ("Houthi missile hits a US destroyer in the Red Sea", "warship"),
+    ("Iranian mine sinks a Saudi frigate in the Gulf", "warship"),
+    ("Ukraine shoots down a Russian fighter jet over Donetsk", "aircraft_down"),
+    ("A helicopter was shot down near the front line, officials said", "aircraft_down"),
+    ("Israel fires a salvo of missiles at positions in Lebanon", "barrage"),
+    ("Waves of rockets hit towns across northern Israel", "barrage"),
+    ("US strike kills an IRGC commander in a targeted attack on his vehicle", "assassination"),
+    ("Hamas leader killed in a targeted strike in Beirut", "assassination"),
+    ("Explosion hits the port of Hodeidah, cranes damaged", "port"),
+    ("Airstrike damages the harbour at Latakia", "air"),
+    ("Air defences intercept ballistic missiles over Tel Aviv", "intercept"),
+    ("Patriots intercept incoming rockets over Kyiv", "intercept"),
+    ("North Korea detonated a nuclear warhead at a test site, Seoul said", "nuclear_detonation"),
+    ("A nuclear weapon exploded at the proving ground, monitors confirmed", "nuclear_detonation"),
 
     # after/amid should still allow a completed action
     ("After weeks of talks, Israel struck a Hezbollah depot in Lebanon", "facility"),

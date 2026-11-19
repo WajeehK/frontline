@@ -859,25 +859,17 @@ function clearLiveFx() {
   dead.forEach(o => { world.remove(o); o.material?.dispose?.(); });
   SC.objs = SC.objs.filter(o => !dead.includes(o));
 }
-const CLIP_LABEL = { missile: 'MISSILE STRIKE', drone: 'DRONE', ship: 'SHIP STRIKE', airstrike: 'AIRSTRIKE', intercept: 'INTERCEPT' };
-const DRONE_DOWN_RX = /\b(shot down|shoots down|shooting down|downed|downs|forced down|force down)\b/i;
-const INTERCEPT_RX = /\b(intercept(?:ed|s|ing|ion)?|air[- ]?defen[cs]e|patriot|thaad|iron dome)\b/i;
-const SHIP_RX = /\b(tankers?|ships?|vessels?|warships?|frigates?)\b/i;
-const AIRSTRIKE_RX = /\b(air ?strikes?|airstrikes?|bombing|bombed|bombs|shelling|shelled)\b/i;
-const BALLISTIC_RX = /\b(missiles?|ballistic)\b/i;
+const CLIP_LABEL = {
+  missile: 'MISSILE STRIKE', drone: 'DRONE STRIKE', drone_capture: 'DRONE DOWNED', air: 'AIRSTRIKE', artillery: 'ARTILLERY',
+  intercept: 'INTERCEPT', tanker: 'TANKER HIT', warship: 'WARSHIP HIT', seizure: 'VESSEL SEIZED', nuclear_site: 'NUCLEAR SITE',
+  facility: 'FACILITY STRUCK', troop: 'TROOP MOVEMENT', cyber: 'CYBER', ceasefire: 'CEASEFIRE', blast: 'INCIDENT',
+  aircraft_down: 'AIRCRAFT DOWN', barrage: 'BARRAGE', assassination: 'TARGETED STRIKE', port: 'PORT STRIKE', nuclear_detonation: 'NUCLEAR DETONATION'
+};
 function clipOf(e) {
   if (!e) return null;
   annotateEvent(e);
   if (!e.confirmed || e.anim === 'none' || isSpeculative(e.title)) return null;
-  const t = e.title || '', anim = e.anim || '';
-  const droneDown = anim === 'drone_capture' || (/\b(drones?|uavs?|shaheds?)\b/i.test(t) && DRONE_DOWN_RX.test(t));
-  if (droneDown) return 'drone';
-  if (INTERCEPT_RX.test(t)) return 'intercept';
-  if (anim === 'tanker' || anim === 'seizure' || (SHIP_RX.test(t) && (anim === 'blast' || anim === 'naval' || /\b(hit|hits|struck|attacked|ablaze|sank|sunk)\b/i.test(t)))) return 'ship';
-  if (anim === 'missile' || BALLISTIC_RX.test(t)) return 'missile';
-  if (anim === 'air' || anim === 'artillery' || AIRSTRIKE_RX.test(t)) return 'airstrike';
-  if (anim === 'drone') return 'drone';
-  return null;
+  return CLIP_LABEL[e.anim] ? e.anim : (e.anim === 'naval' || e.anim === 'mine' ? 'tanker' : null);
 }
 function fmtLL(lat, lon) {
   if (lat == null || lon == null || Number.isNaN(+lat) || Number.isNaN(+lon)) return '';
@@ -886,19 +878,254 @@ function fmtLL(lat, lon) {
 function hmUK(ts) {
   return new Date((ts || 0) * 1000).toLocaleString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false }) + ' UK';
 }
-function stopAlertVideo() {
-  const v = $('#vaVid'); if (!v) return;
-  try { v.pause(); } catch (_) { }
-  v.removeAttribute('src'); v.removeAttribute('poster'); v.load();
+const VA = { raf: 0, t0: 0, dur: 6800, kind: null, map: null, lat: 0, lon: 0, seed: 1, gen: 0 };
+const TILEC = {};
+const VA_NOISE = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), d = g.createImageData(128, 128);
+  for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255 | 0; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 40; }
+  g.putImageData(d, 0, 0); return c; })();
+function lonLatTile(lat, lon, z) {
+  const n = 2 ** z, x = Math.floor((lon + 180) / 360 * n);
+  const r = lat * Math.PI / 180, y = Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n);
+  return { x, y, n };
+}
+function loadAlertTiles(lat, lon, z = 13) {
+  const { x, y, n } = lonLatTile(lat, lon, z);
+  const c = document.createElement('canvas'); c.width = c.height = 768; const g = c.getContext('2d');
+  g.fillStyle = '#161a14'; g.fillRect(0, 0, 768, 768);
+  const jobs = [];
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+    const tx = ((x + dx) % n + n) % n, ty = Math.max(0, Math.min(n - 1, y + dy));
+    jobs.push(new Promise(res => {
+      const im = new Image(); im.crossOrigin = 'anonymous';
+      im.onload = () => { g.drawImage(im, (dx + 1) * 256, (dy + 1) * 256); res(1); };
+      im.onerror = () => res(0);
+      im.src = `https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/${z}/${ty}/${tx}.jpg`;
+    }));
+  }
+  return Promise.all(jobs).then(() => {
+    // bake a green-grey surveillance grade once
+    g.save(); g.globalCompositeOperation = 'saturation'; g.fillStyle = 'rgba(110,110,110,.62)'; g.fillRect(0, 0, 768, 768); g.restore();
+    g.fillStyle = 'rgba(14, 32, 22, .32)'; g.fillRect(0, 0, 768, 768);
+    return c;
+  });
+}
+function stopAlertAnim() {
+  if (VA.raf) cancelAnimationFrame(VA.raf);
+  VA.raf = 0; VA.kind = null; VA.gen++;
   const bar = $('#vaProg'); if (bar) bar.style.width = '0';
+}
+function startAlertAnim(kind, loc) {
+  stopAlertAnim();
+  const cv = $('#vaAnim'); if (!cv) return;
+  VA.kind = kind;
+  VA.lat = loc && loc.lat != null ? +loc.lat : 0;
+  VA.lon = loc && loc.lon != null ? +loc.lon : 0;
+  VA.t0 = performance.now();
+  VA.seed = (Math.abs((VA.lat * 1e4) | 0) ^ Math.abs((VA.lon * 1e4) | 0)) || 1;
+  const key = (Number.isFinite(VA.lat) && Number.isFinite(VA.lon) && (VA.lat || VA.lon)) ? VA.lat.toFixed(3) + ',' + VA.lon.toFixed(3) : '';
+  VA.map = key && TILEC[key] ? TILEC[key] : null;
+  if (key && !VA.map) {
+    const gen = VA.gen;
+    loadAlertTiles(VA.lat, VA.lon).then(c => { if (c) { TILEC[key] = c; if (VA.gen === gen) VA.map = c; } }).catch(() => { });
+  }
+  const loop = now => {
+    if (!VA.kind) return;
+    const t = now - VA.t0, u = Math.min(1, t / VA.dur);
+    drawAlertFrame(cv, u, t);
+    const bar = $('#vaProg'); if (bar) bar.style.width = (u * 100).toFixed(2) + '%';
+    if (u < 1) VA.raf = requestAnimationFrame(loop); else VA.raf = 0;
+  };
+  VA.raf = requestAnimationFrame(loop);
+}
+function vaRng(i) { let x = (VA.seed + i * 9973) | 0; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return ((x >>> 0) % 1000) / 1000; }
+function vaSeg(u, a, b) { return b === a ? 0 : Math.max(0, Math.min(1, (u - a) / (b - a))); }
+function drawAlertFrame(cv, u, ms) {
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  const W = cv.clientWidth || innerWidth, H = cv.clientHeight || innerHeight;
+  if (cv.width !== (W * dpr | 0) || cv.height !== (H * dpr | 0)) { cv.width = W * dpr | 0; cv.height = H * dpr | 0; }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = '#0a0e0b'; g.fillRect(0, 0, W, H);
+  // Ken-Burns cover of the 768 mosaic
+  const kb = 1 + 0.16 * u, panX = (u - .5) * 18, panY = (u - .5) * -12;
+  if (VA.map) {
+    const side = Math.max(W, H) * kb;
+    g.drawImage(VA.map, (W - side) / 2 + panX, (H - side) / 2 + panY, side, side);
+  }
+  // scanlines + grain
+  g.fillStyle = 'rgba(0,0,0,.16)';
+  for (let y = 0; y < H; y += 3) g.fillRect(0, y, W, 1);
+  g.globalAlpha = .22; const no = ((ms / 80) | 0) % 64;
+  g.drawImage(VA_NOISE, -no, -no, W + 128, H + 128); g.globalAlpha = 1;
+  const cx = W * .5, cy = H * .46, k = e => VA.kind === e;
+  drawFx(g, W, H, cx, cy, u, ms);
+  // HUD reticle + coords + timecode
+  g.save(); g.translate(cx, cy); g.strokeStyle = 'rgba(180,230,190,.85)'; g.lineWidth = 1.2;
+  g.beginPath(); g.arc(0, 0, 16, 0, 7); g.stroke();
+  g.beginPath(); g.moveTo(-28, 0); g.lineTo(-10, 0); g.moveTo(10, 0); g.lineTo(28, 0); g.moveTo(0, -28); g.lineTo(0, -10); g.moveTo(0, 10); g.lineTo(0, 28); g.stroke();
+  g.restore();
+  g.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+  g.fillStyle = 'rgba(190,220,195,.8)'; g.textAlign = 'left';
+  const ll = fmtLL(VA.lat, VA.lon) || 'NO FIX';
+  g.fillText(ll, cx + 34, cy - 10);
+  const s = Math.floor(ms / 1000), f = Math.floor((ms % 1000) / (1000 / 24));
+  g.fillText('T+' + String(s).padStart(2, '0') + ':' + String(f).padStart(2, '0'), cx + 34, cy + 6);
+}
+function streak(g, x0, y0, x1, y1, u, w, col) {
+  if (u <= 0 || u > 1) return { x: x1, y: y1 };
+  const x = x0 + (x1 - x0) * u, y = y0 + (y1 - y0) * u;
+  const t0 = Math.max(0, u - .28), bx = x0 + (x1 - x0) * t0, by = y0 + (y1 - y0) * t0;
+  const grd = g.createLinearGradient(bx, by, x, y);
+  grd.addColorStop(0, 'rgba(255,220,160,0)'); grd.addColorStop(1, col || 'rgba(255,230,180,.95)');
+  g.strokeStyle = grd; g.lineWidth = w; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(bx, by); g.lineTo(x, y); g.stroke();
+  g.fillStyle = '#fff6d0'; g.beginPath(); g.arc(x, y, w * 1.05, 0, 7); g.fill();
+  return { x, y };
+}
+function flash(g, x, y, u, r) {
+  if (u <= 0 || u > 1) return;
+  const a = (1 - u) * .85, R = r * (1 + u * .8);
+  const grd = g.createRadialGradient(x, y, 0, x, y, R);
+  grd.addColorStop(0, `rgba(255,245,210,${a})`); grd.addColorStop(1, 'rgba(255,180,80,0)');
+  g.fillStyle = grd; g.beginPath(); g.arc(x, y, R, 0, 7); g.fill();
+}
+function ring(g, x, y, u, r, col) {
+  if (u <= 0 || u > 1) return;
+  g.strokeStyle = col || `rgba(255,220,180,${(1 - u) * .85})`; g.lineWidth = 1.6;
+  g.beginPath(); g.arc(x, y, r * u, 0, 7); g.stroke();
+}
+function smokes(g, x, y, u, n, wind) {
+  if (u <= 0) return;
+  const wx = wind || 28, wy = 10;
+  for (let i = 0; i < n; i++) {
+    const p = vaSeg(u, i * .04, 1), ph = vaRng(30 + i);
+    const sx = x + (ph - .5) * 10 + wx * p, sy = y + (vaRng(80 + i) - .3) * 8 + wy * p;
+    const R = 6 + p * 16 + i, a = Math.sin(Math.min(1, p * 1.3) * Math.PI) * .28;
+    g.fillStyle = `rgba(70,70,68,${a})`; g.beginPath(); g.arc(sx, sy, R, 0, 7); g.fill();
+  }
+}
+function fireGlow(g, x, y, u, r) {
+  if (u <= 0) return;
+  const a = (.35 + .2 * Math.sin(u * 22)) * Math.min(1, u * 3) * (u < .85 ? 1 : (1 - u) / .15);
+  const grd = g.createRadialGradient(x, y, 0, x, y, r);
+  grd.addColorStop(0, `rgba(255,150,40,${a})`); grd.addColorStop(1, 'rgba(255,80,0,0)');
+  g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+}
+function delta(g, x, y, ang, s, col) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = col || 'rgba(230,230,220,.95)';
+  g.beginPath(); g.moveTo(s, 0); g.lineTo(-s * .7, s * .55); g.lineTo(-s * .4, 0); g.lineTo(-s * .7, -s * .55); g.closePath(); g.fill(); g.restore();
+}
+function shipSil(g, x, y, ang, s, war) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = 'rgba(220,220,210,.92)';
+  g.beginPath(); g.moveTo(s * 1.4, 0); g.lineTo(s * .6, s * .28); g.lineTo(-s * 1.1, s * .26); g.lineTo(-s * 1.35, 0); g.lineTo(-s * 1.1, -s * .26); g.lineTo(s * .6, -s * .28); g.closePath(); g.fill();
+  if (war) { g.fillRect(-s * .15, -s * .12, s * .5, s * .24); g.fillRect(s * .2, -s * .04, s * .5, s * .08); }
+  else { g.fillRect(-s * .2, -s * .14, s * .35, s * .28); }
+  g.restore();
+}
+function wake(g, x, y, ang, u) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.strokeStyle = 'rgba(200,220,230,.35)'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(-12, 0); g.lineTo(-12 - 30 * u, 8); g.moveTo(-12, 0); g.lineTo(-12 - 30 * u, -8); g.stroke(); g.restore();
+}
+function drawFx(g, W, H, cx, cy, u, ms) {
+  const K = VA.kind, edge = (dir) => dir === 'n' ? [cx + (vaRng(2) - .5) * 80, -20] : dir === 's' ? [cx + (vaRng(3) - .5) * 80, H + 20] : dir === 'w' ? [-20, cy + (vaRng(4) - .5) * 60] : [W + 20, cy + (vaRng(5) - .5) * 60];
+  const hit = (x, y, start, span) => { const t = vaSeg(u, start, start + span); if (t > 0) { flash(g, x, y, Math.min(1, t / .18), 22); ring(g, x, y, t, 36, `rgba(255,210,150,${(1 - t) * .7})`); smokes(g, x, y, Math.max(0, t - .06), 5); } };
+  if (K === 'missile') {
+    const st = streak(g, -10, cy - 80, cx, cy, vaSeg(u, .06, .46), 2.6);
+    if (u < .46) { /* head in flight */ } else { flash(g, cx, cy, vaSeg(u, .46, .58), 26); ring(g, cx, cy, vaSeg(u, .46, .85), 48); smokes(g, cx, cy, vaSeg(u, .48, 1), 7); }
+  } else if (K === 'drone') {
+    for (let i = 0; i < 4; i++) {
+      const a = -2.4 + i * .55, r = 160, x0 = cx + Math.cos(a) * r, y0 = cy + Math.sin(a) * r * .7;
+      const t = vaSeg(u, .08 + i * .05, .48 + i * .05), p = streak(g, x0, y0, cx + (i - 1.5) * 10, cy + (i - 1.5) * 6, t, 1.6, 'rgba(230,230,200,.9)');
+      if (t < 1 && t > 0) delta(g, p.x, p.y, Math.atan2(cy - y0, cx - x0), 6);
+      hit(cx + (i - 1.5) * 10, cy + (i - 1.5) * 6, .48 + i * .06, .4);
+    }
+  } else if (K === 'drone_capture') {
+    const tFly = vaSeg(u, .04, .4), p = streak(g, cx - 140, cy - 70, cx + 10, cy - 6, tFly, 1.4, 'rgba(220,220,200,.85)');
+    if (tFly > 0 && tFly < 1) delta(g, p.x, p.y, .45, 7);
+    const ti = vaSeg(u, .22, .42); streak(g, cx + 80, H + 10, cx + 10, cy - 6, ti, 2, 'rgba(180,255,200,.95)');
+    if (u >= .42) {
+      flash(g, cx + 10, cy - 6, vaSeg(u, .42, .52), 16);
+      const td = vaSeg(u, .42, .92), ang = .45 + td * 6.2;
+      const dx = cx + 10 + Math.cos(ang) * (8 + td * 50), dy = cy - 6 + td * 90;
+      delta(g, dx, dy, ang + 1.2, 7, 'rgba(200,200,190,.9)'); smokes(g, dx, dy, td, 5, 16);
+    }
+  } else if (K === 'air') {
+    const t = vaSeg(u, .08, .58), p = streak(g, -20, cy - 50, W + 20, cy + 30, t, 1.2, 'rgba(230,230,230,.0)');
+    const x = -20 + (W + 40) * t, y = cy - 50 + 80 * t;
+    if (t > 0 && t < 1) { g.save(); g.translate(x, y); g.rotate(.22); g.fillStyle = 'rgba(230,230,225,.95)'; g.beginPath(); g.moveTo(16, 0); g.lineTo(-10, 6); g.lineTo(-6, 0); g.lineTo(-10, -6); g.closePath(); g.fill(); g.fillRect(-2, -9, 3, 18); g.restore(); }
+    hit(cx - 18, cy + 4, .4, .45); hit(cx + 22, cy + 12, .54, .45);
+  } else if (K === 'artillery') {
+    for (let i = 0; i < 7; i++) hit(cx - 40 + i * 14, cy - 16 + (i % 3) * 12, .16 + i * .1, .35);
+  } else if (K === 'intercept') {
+    for (let i = 0; i < 3; i++) {
+      const ix = cx - 30 + i * 30, iy = cy - 8 + (i - 1) * 10;
+      streak(g, ix - 40 + i * 20, -16, ix, iy, vaSeg(u, .08 + i * .06, .48 + i * .04), 2);
+      streak(g, ix + (i - 1) * 40, H + 12, ix, iy, vaSeg(u, .18 + i * .05, .48 + i * .04), 2, 'rgba(170,255,200,.95)');
+      if (u >= .48 + i * .04) { flash(g, ix, iy, vaSeg(u, .48 + i * .04, .62 + i * .04), 18); ring(g, ix, iy, vaSeg(u, .48 + i * .04, .85), 30, `rgba(200,255,210,${Math.max(0, 1 - (u - .48) * 2)})`); }
+    }
+  } else if (K === 'tanker' || K === 'warship') {
+    const t = Math.min(1, u / .5), x = cx - 50 + t * 50, y = cy + 8, ang = 0.05;
+    wake(g, x, y, ang, .6 + t); shipSil(g, x, y, ang, 16, K === 'warship');
+    if (u >= .5) { flash(g, x + 8, y, vaSeg(u, .5, .62), 22); fireGlow(g, x + 6, y, vaSeg(u, .5, 1), 22); smokes(g, x + 6, y - 4, vaSeg(u, .52, 1), 8, 18); }
+  } else if (K === 'seizure') {
+    shipSil(g, cx, cy, 0, 16, false);
+    for (let i = 0; i < 2; i++) {
+      const t = vaSeg(u, .08, .7), x0 = cx + (i ? 110 : -120), y0 = cy + (i ? 70 : -80);
+      const x = x0 + (cx + (i ? 22 : -22) - x0) * t, y = y0 + (cy - y0) * t;
+      shipSil(g, x, y, Math.atan2(cy - y0, cx - x0), 7, true);
+    }
+    const th = u * 6.28, hx = cx + Math.cos(th) * 36, hy = cy + Math.sin(th) * 22;
+    g.strokeStyle = 'rgba(200,220,200,.4)'; g.beginPath(); g.ellipse(cx, cy, 36, 22, 0, 0, 7); g.stroke();
+    g.fillStyle = 'rgba(220,220,210,.95)'; g.beginPath(); g.arc(hx, hy, 3, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(220,220,210,.7)'; g.beginPath(); g.moveTo(hx - 7, hy); g.lineTo(hx + 7, hy); g.stroke();
+  } else if (K === 'nuclear_site') {
+    [[-22, -8], [18, 6], [4, -20]].forEach((p, i) => hit(cx + p[0], cy + p[1], .2 + i * .16, .4));
+  } else if (K === 'facility' || K === 'blast' || K === 'port') {
+    const pts = K === 'port' ? [[-30, 4], [0, 0], [28, 8]] : [[0, 0], [-16, 10], [18, -8]];
+    pts.forEach((p, i) => { hit(cx + p[0], cy + p[1], .22 + i * .14, .45); fireGlow(g, cx + p[0], cy + p[1], vaSeg(u, .3 + i * .14, 1), 18); });
+  } else if (K === 'troop') {
+    const t = vaSeg(u, .08, .9);
+    for (let i = 0; i < 5; i++) {
+      const p = Math.max(0, t - i * .06), x = cx - 80 + p * 120, y = cy + Math.sin(p * 2) * 8 + i * 3;
+      g.fillStyle = 'rgba(230,230,200,.9)'; g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill();
+    }
+    g.strokeStyle = 'rgba(230,230,200,.5)'; g.lineWidth = 1.2;
+    g.beginPath(); const tip = cx - 80 + t * 120; g.moveTo(cx - 84, cy); g.lineTo(tip + 10, cy + 6); g.stroke();
+  } else if (K === 'cyber') {
+    g.strokeStyle = `rgba(80,255,160,${.35 + .2 * Math.sin(ms / 70)})`; g.lineWidth = 1;
+    const gl = (u > .35 && u < .75 && ((ms / 80) | 0) % 5 === 0);
+    for (let i = -4; i <= 4; i++) { g.beginPath(); g.moveTo(cx - 90, cy + i * 16 + (gl ? (vaRng(i + 9) - .5) * 8 : 0)); g.lineTo(cx + 90, cy + i * 16); g.stroke(); }
+    for (let i = -5; i <= 5; i++) { g.beginPath(); g.moveTo(cx + i * 16, cy - 70); g.lineTo(cx + i * 16, cy + 70); g.stroke(); }
+    if (u > .45) { g.fillStyle = `rgba(0,0,0,${Math.min(.7, (u - .45) * 1.4)})`; g.fillRect(cx - 100, cy - 80, 200, 160); }
+  } else if (K === 'ceasefire') {
+    smokes(g, cx, cy, Math.max(0, 1 - u), 6, 10);
+    const t = vaSeg(u, .2, .9); if (t) { g.strokeStyle = `rgba(255,255,255,${(1 - t) * .55})`; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, 12 + t * 50, 0, 7); g.stroke(); }
+  } else if (K === 'aircraft_down') {
+    const t = vaSeg(u, .06, .42), x = cx - 120 + t * 130, y = cy - 40 + t * 20;
+    if (t < 1) { g.save(); g.translate(x, y); g.rotate(.2); g.fillStyle = 'rgba(230,230,225,.95)'; g.beginPath(); g.moveTo(14, 0); g.lineTo(-9, 5); g.lineTo(-5, 0); g.lineTo(-9, -5); g.closePath(); g.fill(); g.fillRect(-1, -8, 3, 16); g.restore(); }
+    streak(g, cx + 90, H + 8, x, y, vaSeg(u, .2, .42), 2, 'rgba(170,255,200,.95)');
+    if (u >= .42) { flash(g, cx + 10, cy - 20, vaSeg(u, .42, .54), 16); const td = vaSeg(u, .42, .92), ang = .2 + td * 5; const dx = cx + 10 + Math.cos(ang) * td * 40, dy = cy - 20 + td * 80; g.save(); g.translate(dx, dy); g.rotate(ang + 1); g.fillStyle = 'rgba(200,200,190,.9)'; g.beginPath(); g.moveTo(12, 0); g.lineTo(-8, 5); g.lineTo(-8, -5); g.closePath(); g.fill(); g.restore(); smokes(g, dx, dy, td, 6, 14); }
+  } else if (K === 'barrage') {
+    for (let i = 0; i < 10; i++) {
+      const x = cx + (vaRng(i) - .5) * 90, y = cy + (vaRng(i + 20) - .5) * 50;
+      streak(g, x - 80 - vaRng(i + 3) * 40, -16 - i * 8, x, y, vaSeg(u, .05 + i * .03, .42 + i * .03), 1.8);
+      hit(x, y, .42 + i * .03, .4);
+    }
+  } else if (K === 'assassination') {
+    const t = vaSeg(u, .05, .55), x = cx - 40 + t * 50, y = cy + Math.sin(t * 6) * 6;
+    g.fillStyle = 'rgba(230,230,200,.95)'; g.fillRect(x - 5, y - 3, 10, 6);
+    streak(g, -10, cy - 90, x, y, vaSeg(u, .28, .58), 1.8);
+    if (u >= .58) { flash(g, x, y, vaSeg(u, .58, .7), 14); ring(g, x, y, vaSeg(u, .58, .9), 22); smokes(g, x, y, vaSeg(u, .6, 1), 4, 12); }
+  } else if (K === 'nuclear_detonation') {
+    const t = vaSeg(u, .35, 1);
+    if (t > 0 && t < .12) { g.fillStyle = `rgba(255,255,255,${1 - t / .12})`; g.fillRect(0, 0, W, H); }
+    if (t > 0) { flash(g, cx, cy, Math.min(1, t * 1.4), 80); ring(g, cx, cy, t, Math.min(W, H) * .45, `rgba(255,255,240,${(1 - t) * .8})`); }
+  }
 }
 function flyAlertLoc(e) {
   if (!e || S.tid === 'globe' || !S.th) return;
-  try {
-    const P = evPos(e); if (!P || !P.p) return;
-    S.userAt = -1e9; flyTo(P.p);
-  } catch (_) { }
+  try { const P = evPos(e); if (!P || !P.p) return; S.userAt = -1e9; flyTo(P.p); } catch (_) { }
 }
+
 function startAlertQueue() {
   if (S.alertHold && $('#cineHud')?.classList.contains('on')) return;
   S.brkAll = (S.brkQ || []).filter(e => e && !BRK_SEEN.has(e.id));
@@ -920,7 +1147,7 @@ function skipAllAlerts() {
   S._alertE = null;
   const el = $('#cineHud'); if (el) { el.classList.remove('on'); el.hidden = true; }
   document.body.classList.remove('valert');
-  stopAlertVideo();
+  stopAlertAnim();
   if (last) flyAlertLoc(last);
 }
 function showAlert(e) {
@@ -945,29 +1172,14 @@ function showAlert(e) {
     $('#vaMeta').textContent = status + '  ·  ' + nsrc + ' SOURCE' + (nsrc === 1 ? '' : 'S') + '  ·  ' + hmUK(e.ts);
     $('#vaNext').textContent = more ? ('TAP FOR NEXT ALERT  (' + (total - idx) + ' MORE)  ›') : 'TAP TO CLOSE';
   }
-  const v = $('#vaVid'), bar = $('#vaProg');
-  if (bar) bar.style.width = '0';
-  if (v) {
-    stopAlertVideo();
-    if (clip) {
-      v.poster = 'video/' + clip + '.jpg';
-      v.src = 'video/' + clip + '.mp4';
-      v.muted = true; v.loop = false; v.playsInline = true;
-      v.currentTime = 0;
-      const go = () => { v.play().catch(() => { }); };
-      if (v.readyState >= 2) go(); else v.addEventListener('canplay', go, { once: true });
-    }
-  }
+  const bar = $('#vaProg'); if (bar) bar.style.width = '0';
+  stopAlertAnim();
+  if (clip) startAlertAnim(clip, loc);
   vib([20, 30, 20]);
   clearLiveFx();
 }
 (() => {
   const el = $('#cineHud'); if (!el) return;
-  const v = $('#vaVid');
-  if (v) v.addEventListener('timeupdate', () => {
-    const bar = $('#vaProg'); if (!bar || !v.duration) return;
-    bar.style.width = Math.min(100, (v.currentTime / v.duration) * 100).toFixed(2) + '%';
-  });
   let x0 = null, t0 = 0;
   el.addEventListener('pointerdown', e => { x0 = e.clientX; t0 = performance.now(); });
   el.addEventListener('pointerup', e => {
@@ -1928,7 +2140,10 @@ const ANIM_TY = {
   drone_capture: ['DRONE DOWNED', '🛩️', '#ff9a3c'], tanker: ['TANKER HIT', '⚓', '#4fd1ff'], seizure: ['VESSEL SEIZED', '⚓', '#4fd1ff'],
   artillery: ['ARTILLERY', '💥', '#ff7b54'], troop: ['TROOP MOVEMENT', '🛫', '#8fb8ff'], ceasefire: ['CEASEFIRE', '🕊️', '#ffffff'],
   facility: ['FACILITY STRUCK', '💥', '#ff9a6a'], nuclear_site: ['NUCLEAR SITE', '☢', '#c8ff4a'], missile: TY.missile, drone: TY.drone,
-  air: TY.air, cyber: TY.cyber, blast: TY.blast, naval: TY.naval, mine: TY.mine
+  air: TY.air, cyber: TY.cyber, blast: TY.blast, naval: TY.naval, mine: TY.mine,
+  intercept: ['INTERCEPT', '🛡️', '#8fffc4'], warship: ['WARSHIP HIT', '⚓', '#4fd1ff'], aircraft_down: ['AIRCRAFT DOWN', '✈️', '#ff5a3a'],
+  barrage: ['BARRAGE', '🚀', '#ff6a2b'], assassination: ['TARGETED STRIKE', '🎯', '#ff9a6a'], port: ['PORT STRIKE', '⚓', '#4fd1ff'],
+  nuclear_detonation: ['NUCLEAR DETONATION', '☢', '#fff1c4']
 };
 const tagOf = e => { annotateEvent(e); return (e.anim && ANIM_TY[e.anim]) || TY[e.type] || TY.statement; };
 const GLOBE_TH = { name: 'Globe', kind: 'globe', bbox: [-180, -85, 180, 85], zoom: 1, sides: [{ id: 'A', name: 'World', short: 'WORLD', color: '#4da3ff' }, { id: 'B', name: '', short: '', color: '#8fffc4' }], assets: [], labels: [], focus: [20, 35] };
@@ -2350,7 +2565,7 @@ async function init() {
   setInterval(poll, 60000); setInterval(() => { if (document.visibilityState === 'visible') pollFast(); }, 60000); setInterval(renderFresh, 30000); renderFresh();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { poll(); pollFast(); } });
   $('#mkt').addEventListener('click', () => $('#mkt').classList.toggle('paused'));
-window.__fl = { runScen, openScen, endScen, loadScen, SC, S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground, loadTheatre, annotateEvent, GLOBE, liveEvent, camera, controls, startAlertQueue, nextAlert, skipAllAlerts, showAlertAt, clipOf, cineBallistic, cineDrones, cineCam, northUp, clampCamGround, applyStyle, applyGlobeTheme, focusGlobeTheatre };
+window.__fl = { runScen, openScen, endScen, loadScen, SC, S, play, go, flyTo, homeCam, breaking, openOpts, renderSides, loadExtras, ground, loadTheatre, annotateEvent, GLOBE, liveEvent, camera, controls, startAlertQueue, nextAlert, skipAllAlerts, showAlertAt, clipOf, startAlertAnim, stopAlertAnim, cineBallistic, cineDrones, cineCam, northUp, clampCamGround, applyStyle, applyGlobeTheme, focusGlobeTheatre };
 }
 init().catch(err => { $('#boot span').textContent = 'Could not start: ' + err.message; console.error(err); });
 

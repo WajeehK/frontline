@@ -50,7 +50,7 @@ COMPLETED = re.compile(
     r"shot down|shoots down|shooting down|downed|downs|"
     r"captured|captures|capturing|seized|seizes|seizing|boarded|boards|"
     r"destroyed|destroys|destroying|damaged|damages|"
-    r"exploded|explodes|explosion|explosions|blasts?|"
+    r"exploded|explodes|explosion|explosions|blasts?|detonated|detonates|detonating|detonation|"
     r"ablaze|caught fire|catch(?:es)? fire|"
     r"sank|sinks|sunk|raided|raids|"
     r"agreed|agrees|agree|signed|signs|takes effect|took effect|declared|declares|"
@@ -91,6 +91,26 @@ FACILITY = re.compile(
     re.I,
 )
 BLAST = re.compile(r"\b(explosions?|blasts?|blew up|blows up)\b", re.I)
+WARSHIP = re.compile(r"\b(destroyers?|frigates?|cruisers?|corvettes?|warships?|aircraft carriers?|\bcarriers?)\b", re.I)
+AIRCRAFT = re.compile(r"\b(fighter jets?|fighter aircraft|fighters?|helicopters?|helos?|warplanes?|\baircraft\b|bombers?|\bjets?\b|apaches?|chinooks?|f-\d{1,2}s?)\b", re.I)
+BARRAGE = re.compile(r"\b(barrage|salvos?|waves? of|dozens of|hundreds of|rain of|hail of)\b", re.I)
+ASSASS = re.compile(
+    r"\b(assassinat(?:ed|ion|es|ing)|targeted (?:strike|killing|attack)|"
+    r"(?:commander|leader|general|admiral|chief) \w*(?:killed|struck|hit)|"
+    r"killed (?:an? )?(?:irgc |hamas |hezbollah |houthis? )?(?:commander|leader|general)|"
+    r"targeted (?:vehicle|convoy|car))\b",
+    re.I,
+)
+PORT = re.compile(r"\b(ports?|harbou?rs?|dockyards?|seaports?|container terminals?)\b", re.I)
+NUKE_DET = re.compile(
+    r"\b((?:nuclear|atomic|thermonuclear|hydrogen) (?:weapon|warhead|bomb|device|blast)s?|"
+    r"(?:warhead|nuclear device)s? (?:detonat\w+|explod\w+|went off|goes off)|"
+    r"detonat\w+ (?:a |an )?(?:nuclear|atomic|thermonuclear|hydrogen))\b",
+    re.I,
+)
+INTERCEPT = re.compile(r"\b(intercept(?:ed|s|ing|ion)?|air[- ]?defen[cs]e|patriots?|\bthaad\b|iron dome)\b", re.I)
+HIT = re.compile(r"\b(struck|strikes|striking|hit|hits|hitting|attacked|destroyed|damaged|sank|sinks|sunk|ablaze|bombed)\b", re.I)
+DOWNED = re.compile(r"\b(shot down|shoots down|shooting down|downed|downs)\b", re.I)
 
 # Types that are never animated on their own.
 NO_ANIM_TYPES = {"statement", "threat", "legal", "sanctions", "diplomacy"}
@@ -127,14 +147,26 @@ def anim_of(title: str, typ: str | None = None) -> str:
         return "none"
     if CEASEFIRE.search(t):
         return "ceasefire"
+    if NUKE_DET.search(t):
+        return "nuclear_detonation"
     if DRONE.search(t) and CAPTURE.search(t):
         return "drone_capture"
-    if SEIZE.search(t) and (TANKER.search(t) or SHIP.search(t)):
+    if AIRCRAFT.search(t) and DOWNED.search(t) and not DRONE.search(t):
+        return "aircraft_down"
+    if ASSASS.search(t):
+        return "assassination"
+    if SEIZE.search(t) and (TANKER.search(t) or SHIP.search(t) or WARSHIP.search(t)):
         return "seizure"
     if TANKER.search(t) and (COMPLETED.search(t) or BLAST.search(t)):
         return "tanker"
+    if WARSHIP.search(t) and HIT.search(t):
+        return "warship"
     if NUKE_SITE.search(t) and (COMPLETED.search(t) or BLAST.search(t)):
         return "nuclear_site"
+    if BARRAGE.search(t) and (MISSILE.search(t) or ARTY.search(t)):
+        return "barrage"
+    if INTERCEPT.search(t) and not DRONE.search(t):
+        return "intercept"
     if MISSILE.search(t):
         return "missile"
     if AIR.search(t):
@@ -149,6 +181,8 @@ def anim_of(title: str, typ: str | None = None) -> str:
         return "troop"
     if typ == "ground" or ARTY.search(t):
         return "artillery" if ARTY.search(t) else "troop"
+    if PORT.search(t) and (BLAST.search(t) or COMPLETED.search(t)):
+        return "port"
     if (FACILITY.search(t) or typ == "blast") and (BLAST.search(t) or COMPLETED.search(t)):
         return "facility"
     if typ == "naval":

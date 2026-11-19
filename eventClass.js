@@ -3,7 +3,7 @@
 // headlines get the same animation gate as newly fetched ones.
 const SPECULATIVE = /\b(weighs?|weighing|consider(?:s|ed|ing)?|mulls?|mulling|options?|optionally|could|would|may|might|should|warns?|warning|threatened|threatens?|vows?|vow(?:ed|ing)|plans? to|planning to|prepar(?:e|es|ed|ing) to|ready to|ready for|seeks?|seeking|calls? (?:for|on)|urg(?:e|es|ed|ing)|wants?|demands?|asks? (?:for|to)|predicts?|expects?|expected to|likely to|possible|possibility|potential(?:ly)?|hypothetical|scenario|in case|if necessary|to (?:strike|attack|bomb|hit|invade|launch|target))\b/i;
 const CONTEXT_OK = /\b(after|amid|following|in the wake of|despite)\b/i;
-const COMPLETED = /\b(struck|strikes|striking|hit|hits|hitting|attacked|attacks|attacking|attack|bombed|bombs|bombing|shelled|shells|shelling|pounded|pounds|launched|launches|launching|fired|fires|firing|killed|kills|killing|wounded|injured|dead|intercepted|intercepts|intercepting|intercept|shot down|shoots down|shooting down|downed|downs|captured|captures|capturing|seized|seizes|seizing|boarded|boards|destroyed|destroys|destroying|damaged|damages|exploded|explodes|explosion|explosions|blasts?|ablaze|caught fire|catch(?:es)? fire|sank|sinks|sunk|raided|raids|agreed|agrees|agree|signed|signs|takes effect|took effect|declared|declares|advanc(?:e|es|ed|ing)|deployed|deploys|clashed|clashes|fighting|hacked|hacks|breached|breaches)\b/i;
+const COMPLETED = /\b(struck|strikes|striking|hit|hits|hitting|attacked|attacks|attacking|attack|bombed|bombs|bombing|shelled|shells|shelling|pounded|pounds|launched|launches|launching|fired|fires|firing|killed|kills|killing|wounded|injured|dead|intercepted|intercepts|intercepting|intercept|shot down|shoots down|shooting down|downed|downs|captured|captures|capturing|seized|seizes|seizing|boarded|boards|destroyed|destroys|destroying|damaged|damages|exploded|explodes|explosion|explosions|blasts?|detonated|detonates|detonating|detonation|ablaze|caught fire|catch(?:es)? fire|sank|sinks|sunk|raided|raids|agreed|agrees|agree|signed|signs|takes effect|took effect|declared|declares|advanc(?:e|es|ed|ing)|deployed|deploys|clashed|clashes|fighting|hacked|hacks|breached|breaches)\b/i;
 const COMMENTARY = /(\b(analysis|opinion|op-?ed|explainer|column|commentary|podcast|editorial)\b|\?$|^\s*(what|why|how|who is|could|will|is)\b)/i;
 const QUOTED = /^\s*['"‘“]/;
 const DENIAL = /\b(denies|denied|deny|false|fake|no evidence|hoax|debunk\w*|rumou?rs?)\b/i;
@@ -21,6 +21,15 @@ const CYBER = /\b(cyber[- ]?attacks?|\bcyber\b|hack(?:ed|ers|ing)?|data breach)\
 const NUKE_SITE = /\b(nuclear (?:site|facility|plant|reactor|complex)|enrichment|natanz|fordow|bushehr|zaporizhzhia nuclear|dimona)\b/i;
 const FACILITY = /\b(bases?|air ?bases?|airfields?|facilit(?:y|ies)|refiner(?:y|ies)|depots?|ports?|headquarters|\bhq\b|barracks|installations?|compounds?|plants?|terminals?|power station|substations?|radar)\b/i;
 const BLAST = /\b(explosions?|blasts?|blew up|blows up)\b/i;
+const WARSHIP = /\b(destroyers?|frigates?|cruisers?|corvettes?|warships?|aircraft carriers?|\bcarriers?)\b/i;
+const AIRCRAFT = /\b(fighter jets?|fighter aircraft|fighters?|helicopters?|helos?|warplanes?|\baircraft\b|bombers?|\bjets?\b|apaches?|chinooks?|f-\d{1,2}s?)\b/i;
+const BARRAGE = /\b(barrage|salvos?|waves? of|dozens of|hundreds of|rain of|hail of)\b/i;
+const ASSASS = /\b(assassinat(?:ed|ion|es|ing)|targeted (?:strike|killing|attack)|(?:commander|leader|general|admiral|chief) \w*(?:killed|struck|hit)|killed (?:an? )?(?:irgc |hamas |hezbollah |houthis? )?(?:commander|leader|general)|targeted (?:vehicle|convoy|car))\b/i;
+const PORT = /\b(ports?|harbou?rs?|dockyards?|seaports?|container terminals?)\b/i;
+const NUKE_DET = /\b((?:nuclear|atomic|thermonuclear|hydrogen) (?:weapon|warhead|bomb|device|blast)s?|(?:warhead|nuclear device)s? (?:detonat\w+|explod\w+|went off|goes off)|detonat\w+ (?:a |an )?(?:nuclear|atomic|thermonuclear|hydrogen))\b/i;
+const INTERCEPT = /\b(intercept(?:ed|s|ing|ion)?|air[- ]?defen[cs]e|patriots?|\bthaad\b|iron dome)\b/i;
+const HIT = /\b(struck|strikes|striking|hit|hits|hitting|attacked|destroyed|damaged|sank|sinks|sunk|ablaze|bombed)\b/i;
+const DOWNED = /\b(shot down|shoots down|shooting down|downed|downs)\b/i;
 const NO_ANIM = new Set(['statement', 'threat', 'legal', 'sanctions', 'diplomacy']);
 
 export function isSpeculative(title) {
@@ -42,10 +51,16 @@ export function animOf(title, typ) {
   const t = title || '';
   if (!isConfirmed(t, typ)) return 'none';
   if (CEASEFIRE.test(t)) return 'ceasefire';
+  if (NUKE_DET.test(t)) return 'nuclear_detonation';
   if (DRONE.test(t) && CAPTURE.test(t)) return 'drone_capture';
-  if (SEIZE.test(t) && (TANKER.test(t) || SHIP.test(t))) return 'seizure';
+  if (AIRCRAFT.test(t) && DOWNED.test(t) && !DRONE.test(t)) return 'aircraft_down';
+  if (ASSASS.test(t)) return 'assassination';
+  if (SEIZE.test(t) && (TANKER.test(t) || SHIP.test(t) || WARSHIP.test(t))) return 'seizure';
   if (TANKER.test(t) && (COMPLETED.test(t) || BLAST.test(t))) return 'tanker';
+  if (WARSHIP.test(t) && HIT.test(t)) return 'warship';
   if (NUKE_SITE.test(t) && (COMPLETED.test(t) || BLAST.test(t))) return 'nuclear_site';
+  if (BARRAGE.test(t) && (MISSILE.test(t) || ARTY.test(t))) return 'barrage';
+  if (INTERCEPT.test(t) && !DRONE.test(t)) return 'intercept';
   if (MISSILE.test(t)) return 'missile';
   if (AIR.test(t)) return 'air';
   if (DRONE.test(t)) return 'drone';
@@ -53,6 +68,7 @@ export function animOf(title, typ) {
   if (typ === 'cyber' || CYBER.test(t)) return 'cyber';
   if (typ === 'deploy' || (TROOP.test(t) && (typ === 'deploy' || typ === 'ground' || typ == null || typ === 'naval'))) return 'troop';
   if (typ === 'ground' || ARTY.test(t)) return ARTY.test(t) ? 'artillery' : 'troop';
+  if (PORT.test(t) && (BLAST.test(t) || COMPLETED.test(t))) return 'port';
   if ((FACILITY.test(t) || typ === 'blast') && (BLAST.test(t) || COMPLETED.test(t))) return 'facility';
   if (typ === 'naval') return TANKER.test(t) ? 'tanker' : SEIZE.test(t) ? 'seizure' : 'blast';
   if (typ === 'mine') return TANKER.test(t) ? 'tanker' : 'blast';
