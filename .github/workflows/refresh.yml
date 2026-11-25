@@ -9,14 +9,18 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  actions: read
+concurrency:
+  group: pages-refresh
+  cancel-in-progress: false
 jobs:
   refresh:
     concurrency: {group: refresh, cancel-in-progress: false}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 16
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy_retry.outputs.page_url || steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Restore rolling files from the live site (markets, aircraft, naval reports, encrypted push state)
@@ -47,7 +51,19 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: .
+      # deploy-pages can miss a just-uploaded artifact ("Found 0") or the Pages
+      # backend can return "Deployment failed, try again later." Retry the deploy
+      # only — do not re-upload, or we get a duplicate github-pages artifact.
+      - name: Wait for the Pages artifact to be visible
+        run: sleep 20
       - id: deploy
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: Wait before retrying a failed Pages deploy
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 90
+      - id: deploy_retry
+        if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
   # Self-scheduling chain (GitHub's cron is often late or skipped): ~13 min after each run, dispatch the next one
   # unless a newer run already exists, so parallel triggers converge to a single chain.
