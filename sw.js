@@ -1,6 +1,6 @@
 // activate deletes old caches except the push log
-const C='fl-v33';
-const FILES=['./','index.html','style.css','app.js','eventClass.js','geo/earth.jpg','geo/earth-day.jpg','geo/earth-night.jpg','geo/earth-spec.jpg','geo/earth-clouds.jpg','geo/borders-110m.json','icons/fl-crest.svg','manifest-v13.webmanifest','vendor/three.module.min.js','vendor/OrbitControls.js','geo/theatres.json','geo/us-iran.png','geo/us-iran.json','icons/b2r-icon-192.png','icons/b2r-icon-512.png','icons/b2r-favicon-32.png','icons/b2r-apple-touch-icon.png','icons/b2r-maskable-512.png','icons/b2r-logo.svg'];
+const C='fl-v34';
+const FILES=['./','index.html','style.css','app.js','eventClass.js','geo/earth.jpg','geo/earth-day.jpg','geo/earth-night.jpg','geo/earth-spec.jpg','geo/earth-clouds.jpg','geo/borders-110m.json','manifest-v14.webmanifest','vendor/three.module.min.js','vendor/OrbitControls.js','geo/theatres.json','geo/us-iran.png','geo/us-iran.json','icons/icon-b2-192.png','icons/icon-b2-512.png','icons/icon-b2-favicon-32.png','icons/icon-b2-apple-touch.png','icons/icon-b2-maskable-512.png','icons/icon-b2-craft.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>Promise.all(FILES.map(f=>fetch(new Request(f,{cache:'reload'})).then(r=>{if(r.ok)return c.put(f,r);}).catch(()=>{})))));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C&&k!=='fl-pushlog').map(k=>caches.delete(k)))));self.clients.claim();});
 const FRESH=/(\/|index\.html|app\.js|style\.css|\.json|\.webmanifest)$/;
@@ -9,7 +9,7 @@ self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new
  e.respondWith(caches.match(e.request,{ignoreSearch:true}).then(r=>r||fetch(e.request).then(res=>{if(res.ok){const cl=res.clone();caches.open(C).then(c=>c.put(e.request,cl));}return res;})));});
 
 self.addEventListener('push',e=>{let d={};try{d=e.data.json()}catch(_){d={title:'Frontline',body:e.data&&e.data.text()}}
- e.waitUntil(Promise.all([self.registration.showNotification(d.title||'Frontline',{body:d.body||'',tag:d.tag,icon:'icons/b2r-icon-192.png',badge:'icons/b2r-favicon-32.png',data:{url:d.url||'./'}}),
+ e.waitUntil(Promise.all([self.registration.showNotification(d.title||'Frontline',{body:d.body||'',tag:d.tag,icon:'icons/icon-b2-192.png',badge:'icons/icon-b2-favicon-32.png',data:{url:d.url||'./'}}),
   caches.open('fl-pushlog').then(c=>c.put('last-push',new Response(JSON.stringify({at:Date.now(),d})))),
   clients.matchAll({type:'window'}).then(cs=>cs.forEach(c=>c.postMessage({type:'pushed',d})))]))});
 self.addEventListener('notificationclick',e=>{e.notification.close();const url=new URL((e.notification.data&&e.notification.data.url)||'./',self.registration.scope).href;

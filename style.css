@@ -563,46 +563,45 @@ body.cine #scCap{top:auto;bottom:calc(var(--safeB,0px) + 22px);z-index:42;backgr
 .gMk{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}.gMk div{background:rgba(255,255,255,.04);border-radius:12px;padding:8px 10px;display:grid;grid-template-columns:1fr auto;row-gap:2px}.gMk span{font-size:10.5px;color:#aaa}.gMk b{font-size:14px;grid-row:2}.gMk em{font-style:normal;font-size:11px;font-weight:700;grid-row:2;align-self:end}.gMk .up{color:#3ccf7e}.gMk .dn{color:#ff6b4a}.gMk .gs{grid-column:1/3;width:100%;height:22px}
 .gGrab{display:flex;justify-content:center;padding:8px 0 12px;cursor:grab}.gGrab i{width:44px;height:5px;border-radius:3px;background:rgba(255,255,255,.35)}
 
-/* v11 opening intro: B-2 formation climbs the screen over a sweeping green radar */
-/* v13 classified boot — original crest, not a government seal */
-#intro{position:fixed;inset:0;z-index:200;background:#000;overflow:hidden;color:#8fffc4;font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;transition:opacity .28s ease}
-#intro.out{opacity:0;pointer-events:none}#intro:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 48%,rgba(60,255,154,.12),transparent 55%);pointer-events:none;animation:btVig 2.2s ease-out both}
-#intro .bt-scanlines{position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.28) 2px 3px);pointer-events:none;opacity:.45}
-#intro .bt-term{position:absolute;left:18px;right:18px;top:calc(var(--safeT) + 22px);height:34%;overflow:hidden;text-shadow:0 0 8px rgba(60,255,154,.45)}
-#intro .bt-term div{opacity:0;animation:btLine .22s ease forwards;white-space:nowrap;overflow:hidden}
-#intro .bt-bio{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:14px;opacity:0;transition:opacity .45s ease;pointer-events:none}
-#intro .bt-bio{visibility:hidden}
-#intro.stage-bio .bt-bio{opacity:1;visibility:visible}
-#intro .bt-eye{position:relative;width:148px;height:148px;border-radius:50%;border:1px solid rgba(60,255,154,.55);box-shadow:0 0 0 8px rgba(60,255,154,.05),inset 0 0 30px rgba(60,255,154,.12);overflow:hidden;background:radial-gradient(circle at 50% 45%,#0b2014 0%,#020805 70%)}
-#intro .bt-iris{position:absolute;left:50%;top:50%;width:78px;height:78px;margin:-39px;border-radius:50%;background:repeating-conic-gradient(from 0deg,#1d6b45 0 8deg,#0c2a1a 8deg 16deg);box-shadow:0 0 16px rgba(60,255,154,.4);animation:btSpin 4s linear infinite}
-#intro .bt-pupil{position:absolute;left:50%;top:50%;width:28px;height:28px;margin:-14px;border-radius:50%;background:#040806;box-shadow:0 0 0 2px #3cff9a}
-#intro .bt-crosshair{position:absolute;inset:0;background:linear-gradient(#3cff9a,#3cff9a) center/1px 100% no-repeat,linear-gradient(#3cff9a,#3cff9a) center/100% 1px no-repeat;opacity:.55}
-#intro .bt-scanbar{position:absolute;left:8%;right:8%;height:2px;background:linear-gradient(90deg,transparent,#3cff9a,transparent);top:10%;animation:btBar 1.6s ease-in-out .9s infinite;box-shadow:0 0 10px #3cff9a}
-#intro .bt-biolbl{font-size:9.5px;letter-spacing:.22em;color:#8fffc4;font-weight:700}
-#intro .bt-clearance{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;align-items:center;gap:16px;opacity:0;transition:opacity .45s ease;pointer-events:none}
-#intro .bt-clearance{visibility:hidden}
-#intro.stage-clear .bt-clearance{opacity:1;visibility:visible;animation:btPop .5s cubic-bezier(.16,1,.3,1) both}
-#intro .bt-crest{width:92px;height:92px;filter:drop-shadow(0 0 18px rgba(60,255,154,.55));animation:btCrest .7s cubic-bezier(.16,1,.3,1) both}
-#intro .bt-stamp{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:10px;letter-spacing:.32em;font-weight:800;color:#8fffc4}
-#intro .bt-stamp span{font-size:13px;letter-spacing:.18em;color:#eafff2;padding:6px 12px;border:1px solid #3cff9a;box-shadow:0 0 0 3px rgba(60,255,154,.12),0 0 20px rgba(60,255,154,.25);background:rgba(10,30,16,.65);animation:btStamp .55s cubic-bezier(.16,1,.3,1) .12s both}
-#intro .bt-lock{position:absolute;left:50%;bottom:calc(var(--safeB) + 48px);transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;opacity:0;transition:opacity .45s ease;pointer-events:none;text-align:center}
-#intro .bt-lock{visibility:hidden}
-#intro.stage-lock .bt-lock{opacity:1;visibility:visible;animation:btPop .45s cubic-bezier(.16,1,.3,1) both}
-#intro .bt-globe{width:84px;height:84px;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(80,160,140,.45),rgba(8,16,20,.2) 45%,transparent 60%),repeating-radial-gradient(circle at 50% 50%,transparent 0 8px,rgba(60,255,154,.2) 8px 9px),#07110c;border:1px solid rgba(60,255,154,.4);box-shadow:inset 8px 0 18px rgba(0,0,0,.45),0 0 18px rgba(60,255,154,.2);animation:btSpin 12s linear infinite}
-#intro .bt-reticle{position:absolute;top:0;width:84px;height:84px}
-#intro .bt-reticle i{position:absolute;inset:-6px;border:1px solid rgba(60,255,154,.7);border-radius:2px;clip-path:polygon(0 0,18% 0,18% 18%,0 18%,0 0,0 82%,0 100%,18% 100%,18% 82%,0 82%,0 100%,82% 100%,100% 100%,100% 82%,82% 82%,82% 100%,100% 100%,100% 0,82% 0,82% 18%,100% 18%,100% 0)}
-#intro .bt-reticle i:last-of-type{inset:-14px;opacity:.5;animation:btPulse 1.4s ease-in-out infinite}
-#intro .bt-reticle b{position:absolute;left:50%;top:50%;width:8px;height:8px;margin:-4px;border-radius:50%;background:#3cff9a;box-shadow:0 0 8px #3cff9a}
-#intro .bt-lock span{font-size:9px;letter-spacing:.2em;font-weight:700;color:#8fffc4}
-#intro .bt-skip{position:absolute;left:0;right:0;bottom:calc(var(--safeB) + 14px);background:none;border:0;color:rgba(143,255,196,.45);font:700 9px/1 ui-monospace,monospace;letter-spacing:.2em;pointer-events:none}
-#intro.quick .bt-term,#intro.quick .bt-bio,#intro.quick .bt-lock,#intro.quick .bt-skip{display:none}
-#intro.quick .bt-clearance{animation:none;opacity:1}
-@keyframes btLine{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes btPop{from{opacity:0;filter:blur(8px);transform:scale(.92)}to{opacity:1;filter:none;transform:none}}@keyframes btCrest{from{opacity:0;transform:scale(.7) rotate(-8deg);filter:drop-shadow(0 0 0 transparent)}to{opacity:1;transform:none}}@keyframes btStamp{from{opacity:0;transform:scale(1.12);letter-spacing:.5em}to{opacity:1;transform:none}}@keyframes btVig{0%{opacity:0}40%{opacity:1}100%{opacity:.7}}
-@keyframes btFade{from{opacity:0}to{opacity:1}}
-@keyframes btSpin{to{transform:rotate(360deg)}}
-@keyframes btBar{0%{top:12%}50%{top:82%}100%{top:12%}}
-@keyframes btPulse{50%{opacity:.15;transform:scale(1.08)}}
-@media (prefers-reduced-motion:reduce){#intro *{animation:none!important}#intro .bt-clearance{opacity:1;transform:translateY(-50%)}}
+/* v34 B-2 intro — monochrome flying-wing over a dark radar grid */
+#intro{position:fixed;inset:0;z-index:200;background:#050506;overflow:hidden;color:#c8c8cc;font:13px/1.45 ui-sans-serif,system-ui,sans-serif;transition:opacity .28s ease}
+#intro.out{opacity:0;pointer-events:none}
+#intro .bt-grid{position:absolute;inset:0;pointer-events:none;background:
+  radial-gradient(ellipse at 50% 44%,rgba(200,200,210,.08),transparent 58%),
+  repeating-linear-gradient(0deg,transparent 0 39px,rgba(255,255,255,.045) 39px 40px),
+  repeating-linear-gradient(90deg,transparent 0 39px,rgba(255,255,255,.045) 39px 40px);
+  -webkit-mask-image:radial-gradient(ellipse at 50% 45%,#000 38%,transparent 78%);
+  mask-image:radial-gradient(ellipse at 50% 45%,#000 38%,transparent 78%)}
+#intro .bt-grid:after{content:"";position:absolute;left:50%;top:44%;width:160vmax;height:160vmax;margin:-80vmax;border-radius:50%;
+  background:repeating-radial-gradient(circle,transparent 0 70px,rgba(255,255,255,.05) 70px 71px);opacity:.85;pointer-events:none}
+#intro .bt-sweep{position:absolute;left:50%;top:44%;width:140vmax;height:140vmax;margin:-70vmax;border-radius:50%;pointer-events:none;
+  background:conic-gradient(from 210deg,transparent 0 76%,rgba(220,220,230,.09) 90%,transparent 100%);
+  -webkit-mask-image:radial-gradient(circle,#000 0 52%,transparent 70%);
+  mask-image:radial-gradient(circle,#000 0 52%,transparent 70%)}
+#intro.full .bt-sweep{animation:btSweep 2.2s ease-out both}
+#intro .bt-craft{position:absolute;left:50%;top:43%;width:min(82vw,360px);transform:translate(-50%,-50%);pointer-events:none;z-index:2}
+#intro .bt-craft img{width:100%;height:auto;display:block;filter:drop-shadow(0 12px 20px rgba(0,0,0,.6))}
+#intro.full .bt-craft{animation:btFly 1.25s cubic-bezier(.16,.75,.18,1) both}
+#intro .bt-trail{position:absolute;top:54%;right:82%;height:2px;width:0;border-radius:2px;pointer-events:none;transform-origin:100% 50%;transform:rotate(8deg);
+  background:linear-gradient(90deg,transparent,rgba(210,214,220,.12) 20%,rgba(230,230,235,.5))}
+#intro .bt-trail.b{top:61%;transform:rotate(11deg);opacity:.7;height:1.5px}
+#intro.full .bt-trail{animation:btTrail 1.25s cubic-bezier(.16,.75,.18,1) both}
+#intro.full .bt-trail.b{animation-delay:.05s}
+#intro .bt-mark{position:absolute;left:0;right:0;top:63%;text-align:center;font:800 clamp(18px,5.2vw,26px)/1 system-ui,ui-sans-serif,sans-serif;letter-spacing:.36em;color:#e8e8ec;text-indent:.36em;pointer-events:none;text-shadow:0 0 24px rgba(255,255,255,.12);opacity:0}
+#intro.full .bt-mark{animation:btMark 1s cubic-bezier(.16,1,.3,1) .9s both}
+#intro.quick .bt-mark{animation:btMarkQuick .5s ease both}
+#intro.quick .bt-craft{animation:btCraftQuick .5s ease both}
+#intro.quick .bt-trail{width:min(26vw,130px);opacity:.28}
+#intro.quick .bt-sweep{opacity:.35}
+#intro .bt-skip{position:absolute;left:0;right:0;bottom:calc(var(--safeB) + 14px);background:none;border:0;color:rgba(200,200,208,.38);font:700 9px/1 ui-monospace,monospace;letter-spacing:.2em;pointer-events:none}
+#intro.quick .bt-skip{opacity:0}
+@keyframes btFly{from{transform:translate(calc(-50% - 58vw),calc(-50% + 14%)) scale(.82);opacity:0}18%{opacity:1}to{transform:translate(-50%,-50%) scale(1);opacity:1}}
+@keyframes btTrail{from{width:0;opacity:0}28%{opacity:.65}70%{opacity:.4;width:min(42vw,220px)}to{opacity:.12;width:min(34vw,170px)}}
+@keyframes btMark{from{opacity:0;letter-spacing:.62em;filter:blur(6px);transform:translateY(8px)}to{opacity:1;letter-spacing:.36em;filter:none;transform:none}}
+@keyframes btMarkQuick{from{opacity:0;filter:blur(4px)}to{opacity:1;filter:none}}
+@keyframes btCraftQuick{from{opacity:0;transform:translate(-50%,-50%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes btSweep{from{transform:rotate(-50deg);opacity:0}40%{opacity:1}to{transform:rotate(55deg);opacity:.5}}
+@media (prefers-reduced-motion:reduce){#intro *{animation:none!important}#intro .bt-craft{opacity:1;transform:translate(-50%,-50%)}#intro .bt-mark{opacity:1;transform:none}#intro .bt-trail{width:min(26vw,130px);opacity:.28}}
 
 /* v11.1 top-card grab line (push up = hide, pull down = indicators) + liquid-glass indicators sheet */
 .hgrab{grid-column:1/-1;display:flex;justify-content:center;padding:2px 0 0;margin:-6px 0 -4px;cursor:grab}
@@ -718,19 +717,8 @@ html{background:#000}
 body.globe #ticker,body.globe #note{display:none}
 .ev .play,.ev .noanim{white-space:nowrap;flex:none}
 .ev .m{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
-#intro .bt-lock span{white-space:nowrap;text-align:center;line-height:1.45}
-
 body.globe #mode,body.globe .row3{display:none}
 #ticker.hide{opacity:0;pointer-events:none;transform:translate3d(0,12px,0)}
-
-/* v13 intro stages — hard hide so later rules cannot leak */
-#intro .bt-bio,#intro .bt-clearance,#intro .bt-lock{display:none!important;opacity:0;visibility:hidden}
-#intro.stage-bio .bt-bio{display:flex!important;opacity:1;visibility:visible}
-#intro.stage-clear .bt-clearance{display:flex!important;opacity:1;visibility:visible}
-#intro.stage-lock .bt-lock{display:flex!important;opacity:1;visibility:visible}
-#intro.quick .bt-clearance{display:flex!important;opacity:1;visibility:visible}
-#intro.stage-clear .bt-term,#intro.stage-lock .bt-term{opacity:.28;transition:opacity .35s ease}
-#intro.stage-lock .bt-clearance{transform:translateY(-58%) scale(.92);transition:transform .4s cubic-bezier(.16,1,.3,1)}
 
 /* ---- v14 cinematic alert HUD (over the 3D scene, not a 2D diagram) ---- */
 .vahud{position:fixed;inset:0;z-index:80;background:#050505;color:#fff;pointer-events:auto;opacity:0;transition:opacity .28s ease}
