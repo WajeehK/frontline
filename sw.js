@@ -1,5 +1,5 @@
 // activate deletes old caches except the push log
-const C='fl-v35';
+const C='fl-v36';
 const FILES=['./','index.html','style.css','app.js','eventClass.js','alertFx.js','geo/earth.jpg','geo/earth-day.jpg','geo/earth-night.jpg','geo/earth-spec.jpg','geo/earth-clouds.jpg','geo/borders-110m.json','manifest-v14.webmanifest','vendor/three.module.min.js','vendor/OrbitControls.js','geo/theatres.json','geo/us-iran.png','geo/us-iran.json','icons/icon-b2-192.png','icons/icon-b2-512.png','icons/icon-b2-favicon-32.png','icons/icon-b2-apple-touch.png','icons/icon-b2-maskable-512.png','icons/icon-b2-craft.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>Promise.all(FILES.map(f=>fetch(new Request(f,{cache:'reload'})).then(r=>{if(r.ok)return c.put(f,r);}).catch(()=>{})))));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C&&k!=='fl-pushlog').map(k=>caches.delete(k)))));self.clients.claim();});

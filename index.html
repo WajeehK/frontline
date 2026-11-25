@@ -18,6 +18,28 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-b2-apple-touch.png">
 <meta name="apple-mobile-web-app-title" content="Frontline">
 <link rel="stylesheet" href="style.css">
+<script>
+(function(){
+  function applySafeTop(){
+    var d=document.createElement('div');
+    d.style.cssText='position:fixed;top:env(safe-area-inset-top,0px);left:0;width:0;height:0;visibility:hidden;pointer-events:none';
+    document.documentElement.appendChild(d);
+    var inset=d.getBoundingClientRect().top;
+    d.remove();
+    // Android Chrome can report status-bar + a phantom ~56px title bar even in fullscreen,
+    // which leaves a large empty gap above the HUD. iOS notches must be left intact.
+    if(/Android/i.test(navigator.userAgent)&&inset>48){
+      if(inset>=56) inset=Math.max(0,inset-56);
+      if(inset>48) inset=24;
+    }
+    document.documentElement.style.setProperty('--safeT',inset+'px');
+    if(typeof measureHud==='function') try{measureHud()}catch(e){}
+  }
+  applySafeTop();
+  addEventListener('resize',applySafeTop);
+  addEventListener('orientationchange',applySafeTop);
+})();
+</script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>
 </head>
 <body>
