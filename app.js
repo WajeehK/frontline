@@ -1274,13 +1274,17 @@ const scAlive = o => SC.objs.includes(o);
 function scLoop(o, fn) { const st = performance.now(); fx.push(now => { if (!scAlive(o)) return false; return fn((now - st) / 1000, now) !== false; }); }
 const PBR = (c, r = .55, m = .35) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
 function planform(pts, s) { const sh = new THREE.Shape(); pts.forEach(([x, y], i) => i ? sh.lineTo(x * s, y * s) : sh.moveTo(x * s, y * s)); sh.closePath(); return sh; }
-const B2_PTS = [[0, -.42], [1, .26], [.98, .33], [.64, .52], [.43, .37], [.22, .52], [0, .38], [-.22, .52], [-.43, .37], [-.64, .52], [-.98, .33], [-1, .26]];
-function flatMesh(shape, depth, mat) { const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: depth * .6, bevelSize: depth * .5, bevelSegments: 2 }); g.rotateX(-Math.PI / 2); return new THREE.Mesh(g, mat); }
-function b2Mesh(s = .46) { const g = new THREE.Group(); const body = flatMesh(planform(B2_PTS, s), s * .025, PBR(0x59636e, .55, .35)); g.add(body); const ed = new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry, 30), new THREE.LineBasicMaterial({ color: 0xc8d2dc, transparent: true, opacity: .55 })); g.add(ed);
-  const hump = new THREE.Mesh(new THREE.SphereGeometry(s * .12, 16, 8), PBR(0x4a535c, .6, .3)); hump.scale.set(1.2, .3, 1.8); hump.position.set(0, s * .03, s * .05); g.add(hump);
-  const cp = new THREE.Mesh(new THREE.SphereGeometry(s * .06, 12, 6), PBR(0x0c1820, .15, .8)); cp.scale.set(1.6, .45, 1); cp.position.set(0, s * .055, s * .26); g.add(cp);
-  for (const [x, c] of [[-s * .99, 0xff3030], [s * .99, 0x30ff60]]) { const l = sprite(GLOW, new THREE.Color(c), s * .12); l.position.set(x, 0, -s * .27); g.add(l); }
-  const sh = new THREE.Mesh(new THREE.ShapeGeometry(planform(B2_PTS, s)).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: .35, depthWrite: false })); g.userData.shadow = sh;
+// B-2 planform (top view): nose at +Y so after rotateX(-π/2) it points down -Z, matching Object3D.lookAt. Span:length ≈ 2.5.
+const B2_PTS = [[0, .40], [.16, .32], [.48, .10], [1, -.22], [.86, -.18], [.62, -.38], [.36, -.22], [.16, -.34], [0, -.26], [-.16, -.34], [-.36, -.22], [-.62, -.38], [-.86, -.18], [-1, -.22], [-.48, .10], [-.16, .32]];
+function flatMesh(shape, depth, mat) { const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: depth * .45, bevelSize: depth * .35, bevelSegments: 3 }); g.rotateX(-Math.PI / 2); return new THREE.Mesh(g, mat); }
+function b2Mesh(s = .46) { const g = new THREE.Group(); const skin = PBR(0x2a3036, .72, .22); const body = flatMesh(planform(B2_PTS, s), s * .022, skin); g.add(body);
+  const hump = new THREE.Mesh(new THREE.SphereGeometry(s * .11, 16, 8), PBR(0x262c32, .7, .2)); hump.scale.set(1.15, .28, 1.7); hump.position.set(0, s * .028, -s * .04); g.add(hump);
+  const cp = new THREE.Mesh(new THREE.SphereGeometry(s * .05, 12, 6), PBR(0x0a141c, .12, .85)); cp.scale.set(1.5, .42, 1.1); cp.position.set(0, s * .05, -s * .2); g.add(cp);
+  for (const x of [-s * .32, s * .32]) { const intake = new THREE.Mesh(new THREE.BoxGeometry(s * .16, s * .02, s * .18), PBR(0x16181c, .8, .15)); intake.position.set(x, s * .02, -s * .02); g.add(intake); }
+  for (const [x, c] of [[-s, 0xff2a2a], [s, 0x2aff5a]]) { const l = sprite(GLOW, new THREE.Color(c), s * .07); l.position.set(x, 0, s * .22); g.add(l); }
+  for (const x of [-s * .28, s * .28]) { const ex = sprite(GLOW, new THREE.Color(0xdde8f4), s * .09); ex.position.set(x, 0, s * .3); ex.material.opacity = .35; g.add(ex); }
+  const sh = new THREE.Mesh(new THREE.ShapeGeometry(planform(B2_PTS, s * 1.04)).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0, transparent: true, opacity: .28, depthWrite: false })); sh.scale.set(1, 1, 1); g.userData.shadow = sh;
+  g.userData.contrail = true;
   return g; }
 function jetMesh2(s = .13) { const g = new THREE.Group(); const P = [[0, -1], [.12, -.5], [.18, -.1], [.95, .45], [.95, .58], [.2, .5], [.35, .9], [.35, 1], [0, .95], [-.35, 1], [-.35, .9], [-.2, .5], [-.95, .58], [-.95, .45], [-.18, -.1], [-.12, -.5]];
   g.add(flatMesh(planform(P, s), s * .05, PBR(0x6c7682, .5, .4))); const ab = sprite(GLOW, new THREE.Color(0xffa040), s * .7); ab.position.set(0, 0, -s * 1.02); g.add(ab); g.userData.ab = ab; return g; }
@@ -1604,7 +1608,7 @@ function runScen(sc) {
   const k = sc.kind; let tHit = 4000; const at = (ms, f) => scT(f, ms);
   const alt = p => Math.max(hAt(p.x, p.z), 0);
   const b2run = (target, { drops = 1, L = .1, delay = 0, onHit, alt: A = 1.1, len = 4, dur = 5200 } = {}) => { const a = target.clone().addScaledVector(dir, -len), b = target.clone().addScaledVector(dir, len * .9); a.y = b.y = alt(target) + A;
-    const rel = .5 - .35 / len; const g = b2Mesh(); if (!SC.b2) SC.b2 = g; for (const x of [-.3, .3]) { const c = new THREE.Object3D(); c.position.set(x, 0, -.2); g.add(c); trailFX(g, 0xffffff, .05, 45); break; } fly(g, u => { const p = a.clone().lerp(b, u); p.y += u > rel ? (u - rel) * .9 : 0; return p; }, dur, { delay, bank: .25,
+    const rel = .5 - .35 / len; const g = b2Mesh(); if (!SC.b2) SC.b2 = g; trailFX(g, 0xd8e4f0, .035, 55); trailFX(g, 0xd8e4f0, .028, 70); fly(g, u => { const p = a.clone().lerp(b, u); p.y += u > rel ? (u - rel) * .9 : 0; return p; }, dur, { delay, bank: .25,
       onT: [...Array(drops)].map((_, i) => [rel - .02 + i * .025, p => dropBomb(p, target.clone().addScaledVector(side, (i - (drops - 1) / 2) * .05), { L, dur: 1500, onHit })]) }); return dur * rel + delay + 1500; };
   if (k === 'nuclear') {
     const RR = nukeRadii(sc.yield_kt, sc.burst === 'surface'); const mag = Math.max(1, .6 / scKm(T0.lat, T0.lon, RR[4][1])); const R = { r1: scKm(T0.lat, T0.lon, RR[4][1]) * mag, r5: scKm(T0.lat, T0.lon, RR[2][1]) * mag };
