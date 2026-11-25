@@ -78,20 +78,20 @@
   var timers=[];
   if(!quick && !window.__flHoldIntro){
     addLine();
-    timers.push(setInterval(function(){ addLine(); if(n>=lines.length) clearInterval(timers[0]); }, 280));
-    timers.push(setTimeout(function(){ i.classList.add('stage-bio'); }, 800));
-    timers.push(setTimeout(function(){ i.classList.add('stage-clear'); i.classList.remove('stage-bio'); }, 2000));
-    timers.push(setTimeout(function(){ i.classList.add('stage-lock'); }, 2500));
+    timers.push(setInterval(function(){ addLine(); if(n>=lines.length) clearInterval(timers[0]); }, 110));
+    timers.push(setTimeout(function(){ i.classList.add('stage-bio'); }, 260));
+    timers.push(setTimeout(function(){ i.classList.add('stage-clear'); i.classList.remove('stage-bio'); }, 900));
+    timers.push(setTimeout(function(){ i.classList.add('stage-lock'); }, 1480));
   } else if(window.__flHoldIntro){
     addLine(); addLine(); addLine(); addLine(); addLine();
   }
-  var dur=quick?400:3800;
+  var dur=quick?320:2200;
   function done(){
     if(window.__flHoldIntro) return;
     if(!i.parentNode||i.classList.contains('out')) return;
     i.classList.add('out');
     timers.forEach(function(x){ clearTimeout(x); clearInterval(x); });
-    setTimeout(function(){ i.remove(); }, 560);
+    setTimeout(function(){ i.remove(); }, 280);
   }
   setTimeout(done,dur);
   i.addEventListener('pointerdown',done);
