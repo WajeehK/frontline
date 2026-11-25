@@ -966,15 +966,18 @@ function startAlertAnim(kind, loc) {
   VA.raf = requestAnimationFrame(loop);
 }
 function vaRng(i) { let x = (VA.seed + i * 9973) | 0; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return ((x >>> 0) % 1000) / 1000; }
-function vaSeg(u, a, b) { return b === a ? 0 : Math.max(0, Math.min(1, (u - a) / (b - a))); }
+function vaEase(t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }
+function vaEaseOut(t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return 1 - (1 - t) * (1 - t); }
+function vaEaseIn(t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t; }
+function vaSeg(u, a, b, ease) { const t = b === a ? 0 : Math.max(0, Math.min(1, (u - a) / (b - a))); return ease ? ease(t) : t; }
 function drawAlertFrame(cv, u, ms) {
   const dpr = Math.min(2, devicePixelRatio || 1);
   const W = cv.clientWidth || innerWidth, H = cv.clientHeight || innerHeight;
   if (cv.width !== (W * dpr | 0) || cv.height !== (H * dpr | 0)) { cv.width = W * dpr | 0; cv.height = H * dpr | 0; }
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
   g.fillStyle = '#0a0e0b'; g.fillRect(0, 0, W, H);
-  // Ken-Burns cover of the 768 mosaic
-  const kb = 1 + 0.16 * u, panX = (u - .5) * 18, panY = (u - .5) * -12;
+  // Ken-Burns cover of the 768 mosaic — eased push-in
+  const kbu = vaEase(u), kb = 1 + 0.16 * kbu, panX = (kbu - .5) * 18, panY = (kbu - .5) * -12;
   if (VA.map) {
     const side = Math.max(W, H) * kb;
     g.drawImage(VA.map, (W - side) / 2 + panX, (H - side) / 2 + panY, side, side);
@@ -1000,35 +1003,39 @@ function drawAlertFrame(cv, u, ms) {
 }
 function streak(g, x0, y0, x1, y1, u, w, col) {
   if (u <= 0 || u > 1) return { x: x1, y: y1 };
-  const x = x0 + (x1 - x0) * u, y = y0 + (y1 - y0) * u;
-  const t0 = Math.max(0, u - .28), bx = x0 + (x1 - x0) * t0, by = y0 + (y1 - y0) * t0;
+  const e = vaEaseIn(u), x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e;
+  const t0 = Math.max(0, e - .34), bx = x0 + (x1 - x0) * t0, by = y0 + (y1 - y0) * t0;
   const grd = g.createLinearGradient(bx, by, x, y);
-  grd.addColorStop(0, 'rgba(255,220,160,0)'); grd.addColorStop(1, col || 'rgba(255,230,180,.95)');
+  grd.addColorStop(0, 'rgba(255,220,160,0)'); grd.addColorStop(.55, 'rgba(255,200,120,.35)'); grd.addColorStop(1, col || 'rgba(255,236,200,.95)');
   g.strokeStyle = grd; g.lineWidth = w; g.lineCap = 'round';
   g.beginPath(); g.moveTo(bx, by); g.lineTo(x, y); g.stroke();
-  g.fillStyle = '#fff6d0'; g.beginPath(); g.arc(x, y, w * 1.05, 0, 7); g.fill();
+  g.strokeStyle = 'rgba(255,250,230,.7)'; g.lineWidth = Math.max(1, w * .4);
+  g.beginPath(); g.moveTo((bx + x) / 2, (by + y) / 2); g.lineTo(x, y); g.stroke();
+  g.fillStyle = '#fff8e0'; g.beginPath(); g.arc(x, y, w * 1.15, 0, 7); g.fill();
   return { x, y };
 }
 function flash(g, x, y, u, r) {
   if (u <= 0 || u > 1) return;
-  const a = (1 - u) * .85, R = r * (1 + u * .8);
+  const a = (1 - vaEaseOut(u)) * .75, R = r * (1 + vaEaseOut(u) * .7);
   const grd = g.createRadialGradient(x, y, 0, x, y, R);
-  grd.addColorStop(0, `rgba(255,245,210,${a})`); grd.addColorStop(1, 'rgba(255,180,80,0)');
+  grd.addColorStop(0, `rgba(255,248,220,${a})`); grd.addColorStop(.45, `rgba(255,180,70,${a * .45})`); grd.addColorStop(1, 'rgba(255,180,80,0)');
   g.fillStyle = grd; g.beginPath(); g.arc(x, y, R, 0, 7); g.fill();
 }
 function ring(g, x, y, u, r, col) {
   if (u <= 0 || u > 1) return;
-  g.strokeStyle = col || `rgba(255,220,180,${(1 - u) * .85})`; g.lineWidth = 1.6;
-  g.beginPath(); g.arc(x, y, r * u, 0, 7); g.stroke();
+  const e = vaEaseOut(u);
+  g.strokeStyle = col || `rgba(255,220,180,${(1 - e) * .8})`; g.lineWidth = 1.4;
+  g.beginPath(); g.arc(x, y, r * e, 0, 7); g.stroke();
 }
 function smokes(g, x, y, u, n, wind) {
   if (u <= 0) return;
   const wx = wind || 28, wy = 10;
   for (let i = 0; i < n; i++) {
-    const p = vaSeg(u, i * .04, 1), ph = vaRng(30 + i);
-    const sx = x + (ph - .5) * 10 + wx * p, sy = y + (vaRng(80 + i) - .3) * 8 + wy * p;
-    const R = 6 + p * 16 + i, a = Math.sin(Math.min(1, p * 1.3) * Math.PI) * .28;
-    g.fillStyle = `rgba(70,70,68,${a})`; g.beginPath(); g.arc(sx, sy, R, 0, 7); g.fill();
+    const p = vaEaseOut(vaSeg(u, i * .05, 1)), ph = vaRng(30 + i);
+    const sx = x + (ph - .5) * 12 + wx * p, sy = y + (vaRng(80 + i) - .35) * 8 + wy * p - p * 6;
+    const R = 5 + p * 18 + i * .6, a = Math.sin(Math.min(1, p * 1.25) * Math.PI) * .16;
+    g.fillStyle = `rgba(90,90,86,${a})`; g.beginPath(); g.arc(sx, sy, R, 0, 7); g.fill();
+    g.fillStyle = `rgba(120,118,110,${a * .45})`; g.beginPath(); g.arc(sx - 2, sy - 2, R * .55, 0, 7); g.fill();
   }
 }
 function fireGlow(g, x, y, u, r) {
@@ -1091,13 +1098,13 @@ function drawFx(g, W, H, cx, cy, u, ms) {
       if (u >= .48 + i * .04) { flash(g, ix, iy, vaSeg(u, .48 + i * .04, .62 + i * .04), 18); ring(g, ix, iy, vaSeg(u, .48 + i * .04, .85), 30, `rgba(200,255,210,${Math.max(0, 1 - (u - .48) * 2)})`); }
     }
   } else if (K === 'tanker' || K === 'warship') {
-    const t = Math.min(1, u / .5), x = cx - 50 + t * 50, y = cy + 8, ang = 0.05;
+    const t = vaEase(Math.min(1, u / .5)), x = cx - 50 + t * 50, y = cy + 8, ang = 0.05;
     wake(g, x, y, ang, .6 + t); shipSil(g, x, y, ang, 16, K === 'warship');
     if (u >= .5) { flash(g, x + 8, y, vaSeg(u, .5, .62), 22); fireGlow(g, x + 6, y, vaSeg(u, .5, 1), 22); smokes(g, x + 6, y - 4, vaSeg(u, .52, 1), 8, 18); }
   } else if (K === 'seizure') {
     shipSil(g, cx, cy, 0, 16, false);
     for (let i = 0; i < 2; i++) {
-      const t = vaSeg(u, .08, .7), x0 = cx + (i ? 110 : -120), y0 = cy + (i ? 70 : -80);
+      const t = vaEase(vaSeg(u, .08, .7)), x0 = cx + (i ? 110 : -120), y0 = cy + (i ? 70 : -80);
       const x = x0 + (cx + (i ? 22 : -22) - x0) * t, y = y0 + (cy - y0) * t;
       shipSil(g, x, y, Math.atan2(cy - y0, cx - x0), 7, true);
     }
@@ -1111,7 +1118,7 @@ function drawFx(g, W, H, cx, cy, u, ms) {
     const pts = K === 'port' ? [[-30, 4], [0, 0], [28, 8]] : [[0, 0], [-16, 10], [18, -8]];
     pts.forEach((p, i) => { hit(cx + p[0], cy + p[1], .22 + i * .14, .45); fireGlow(g, cx + p[0], cy + p[1], vaSeg(u, .3 + i * .14, 1), 18); });
   } else if (K === 'troop') {
-    const t = vaSeg(u, .08, .9);
+    const t = vaEase(vaSeg(u, .08, .9));
     for (let i = 0; i < 5; i++) {
       const p = Math.max(0, t - i * .06), x = cx - 80 + p * 120, y = cy + Math.sin(p * 2) * 8 + i * 3;
       g.fillStyle = 'rgba(230,230,200,.9)'; g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill();
