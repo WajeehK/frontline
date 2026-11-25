@@ -563,15 +563,39 @@ function metrics(T) {
 
 // ---------------------------------------------------------------- ticker + feed
 function latestEvs() { return groupClusters().map(g => g.lead).sort((a, b) => b.ts - a.ts).slice(0, 30); }
-function tickerNav(d) { const L = latestEvs(); if (!L.length) return; let i = L.findIndex(x => x.id === (S.tickE && S.tickE.id)); i = i < 0 ? 0 : Math.max(0, Math.min(L.length - 1, i + d)); ticker(L[i]); }
-function ticker(e) {
-  S.tickE = e;
-  const L = latestEvs(); const li = L.findIndex(x => x.id === e.id);
+function tickerHtml(e) {
   const [nm, ic, col] = typOf(e);
-  const side = e.actor ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
-  $('#ticker').innerHTML = `<div class="ic" style="box-shadow:inset 0 0 0 1px ${col}55">${ic}</div><div class="tx"><a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
-   <div class="mt">${e.live ? '<span class="lvb">● LIVE</span>' : ''}<span class="tag" style="color:${col}">${nm}</span>${side ? `<span style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}<span>${esc(e.outlet)}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div></div><div class="tnav"><button data-tn="-1" aria-label="Newer event" ${li <= 0 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button><span>${li < 0 ? '' : (li + 1) + '/' + L.length}</span><button data-tn="1" aria-label="Older event" ${li < 0 || li >= L.length - 1 ? 'disabled' : ''}><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button></div>`;
-  $('#ticker').classList.remove('hide'); const tk = $('#ticker'); tk.classList.remove('tin'); void tk.offsetWidth; tk.classList.add('tin');
+  const side = e.actor && S.th && S.th.sides ? S.th.sides[e.actor === 'A' ? 0 : 1] : null;
+  return `<div class="ic" style="box-shadow:inset 0 0 0 1px ${col}55">${ic}</div><div class="tx"><a class="tt" href="${esc(e.url)}" target="_blank" rel="noopener">${esc(e.title)}</a>
+   <div class="mt">${e.live ? '<span class="lvb">● LIVE</span>' : ''}<span class="tag" style="color:${col}">${nm}</span>${side ? `<span style="color:${side.color}">${esc(side.short)} ▸</span>` : ''}<span>${esc(e.outlet)}</span><span>${hm(e.ts)} · ${ago(e.ts)}</span></div></div>`;
+}
+function armTicker() {
+  clearTimeout(S.tickT);
+  if (typeof RMQ !== 'undefined' && RMQ.matches) return;
+  S.tickT = setTimeout(rotateTicker, 5600);
+}
+function rotateTicker() {
+  const tk = $('#ticker'); if (!tk || tk.classList.contains('hide')) return;
+  const L = latestEvs(); if (L.length < 2) return;
+  let i = L.findIndex(x => x.id === (S.tickE && S.tickE.id));
+  i = (i < 0 ? 0 : i + 1) % Math.min(L.length, 12);
+  ticker(L[i]);
+}
+function ticker(e) {
+  if (!e) return;
+  const tk = $('#ticker'); if (!tk) return;
+  const html = tickerHtml(e);
+  const apply = () => { S.tickE = e; tk.innerHTML = html; tk.classList.remove('hide', 'tfade'); };
+  clearTimeout(S.tickFade);
+  const same = S.tickE && S.tickE.id === e.id && tk.querySelector('.tx');
+  if (same || tk.classList.contains('hide') || !tk.querySelector('.tx')) {
+    apply();
+    tk.classList.remove('tin'); void tk.offsetWidth; tk.classList.add('tin');
+  } else {
+    tk.classList.add('tfade');
+    S.tickFade = setTimeout(() => { apply(); requestAnimationFrame(() => tk.classList.remove('tfade')); }, 280);
+  }
+  armTicker();
 }
 function toLeads(d) { if (d.clusters) return d.clusters.map(c => ({ ...c, id: c.cid, via: (c.outlets && c.outlets[0] || {}).via })); return d.events || []; }
 function groupClusters() { const m = new Map(); for (const e of S.events) { if (!m.has(e.cid)) m.set(e.cid, { lead: e, more: [] }); else m.get(e.cid).more.push(e); } return [...m.values()]; }
@@ -684,7 +708,7 @@ function go(i) {
   $('#sides').classList.toggle('open', i === 2);
   $('#replay').classList.toggle('open', i === 3);
   $('#thSheet').classList.remove('open'); $('#opts').classList.remove('open'); $('#sentS').classList.remove('open'); $('#scen').classList.remove('open');
-  $('#ticker').classList.toggle('hide', i !== 0 && !(DESK.matches && i === 1));
+  $('#ticker').classList.toggle('hide', i !== 0 && !(DESK.matches && i === 1)); if (i === 0 || (DESK.matches && i === 1)) armTicker(); else clearTimeout(S.tickT);
   $('#scrim').classList.toggle('on', (i === 1 && !DESK.matches) || i === 4 || i === 2);
   if (i === 1) renderFeed();
   if (i === 2) renderSides();
@@ -1852,7 +1876,7 @@ addEventListener('pagehide', markVisit);
 
 // ---- sheets: one close path for every panel; handle tap + drag-down to close
 const TAB_SHEETS = { feed: 1, sides: 2, replay: 3, about: 4 };
-$('#ticker').addEventListener('click', ev => { const nb = ev.target.closest('[data-tn]'); if (nb) { ev.preventDefault(); ev.stopPropagation(); S.userAt = performance.now(); S.nextAt = performance.now() + 20000; tickerNav(+nb.dataset.tn); return; } if (!S.tickE) return; ev.preventDefault(); openStory(S.tickE); });
+$('#ticker').addEventListener('click', ev => { if (!S.tickE) return; ev.preventDefault(); openStory(S.tickE); });
 function closeSheet(el) {
   if (!el) return; if (el.id === 'story') { closeStory(); return; }
   if (TAB_SHEETS[el.id] && !(DESK.matches && el.id === 'feed')) { if (dockI === TAB_SHEETS[el.id]) go(0); else el.classList.remove('open'); return; }

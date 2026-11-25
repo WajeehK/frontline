@@ -1,4 +1,4 @@
-:root{--A:#4da3ff;--B:#ff4b3e;--txt:#eef1f5;--dim:rgba(235,238,242,.58);--line:rgba(255,255,255,.12);--glass:rgba(18,18,22,.55);--safeT:env(safe-area-inset-top,0px);--safeB:env(safe-area-inset-bottom,0px);--dockH:66px}
+:root{--A:#4da3ff;--B:#ff4b3e;--txt:#eef1f5;--dim:rgba(235,238,242,.58);--line:rgba(255,255,255,.12);--glass:rgba(18,18,22,.55);--safeT:env(safe-area-inset-top,0px);--safeB:env(safe-area-inset-bottom,0px);--dockH:76px}
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{width:100%;height:100%;height:100dvh;min-height:100%;min-height:100dvh;min-height:-webkit-fill-available;background:#000;color:var(--txt);font:14px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;overflow:hidden;overscroll-behavior:none;margin:0}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
@@ -46,12 +46,10 @@ a{color:#9cc8ff}
 #labels .co .tg{font-size:8.5px;font-weight:800;letter-spacing:.14em;margin-bottom:2px;display:block}
 #labels .off{color:#ffc04d}
 /* ticker */
-#ticker{position:fixed;z-index:9;left:10px;right:10px;bottom:calc(var(--dockH) + 14px + var(--safeB));padding:10px 12px;display:flex;gap:10px;align-items:flex-start;transition:opacity .35s,transform .35s;min-height:58px}
-#ticker .tnav{flex:none;display:flex;align-items:center;gap:2px;align-self:center;font:600 10px ui-monospace,monospace;color:var(--dim)}
-#ticker .tnav button{width:30px;height:30px;border:0;border-radius:10px;background:rgba(255,255,255,.08);display:grid;place-items:center;-webkit-tap-highlight-color:transparent}
-#ticker .tnav button:disabled{opacity:.3}
-#ticker .tnav svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+#ticker{position:fixed;z-index:9;left:10px;right:10px;bottom:calc(var(--dockH) + 12px + var(--safeB));padding:10px 12px;display:flex;gap:10px;align-items:flex-start;transition:opacity .35s,transform .35s;min-height:58px}
 #ticker.hide{opacity:0;transform:translateY(12px);pointer-events:none}
+#ticker .ic,#ticker .tx{transition:opacity .32s ease}
+#ticker.tfade .ic,#ticker.tfade .tx{opacity:0}
 #ticker .ic{flex:none;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;font-size:17px;background:rgba(255,255,255,.07)}
 #ticker .tx{flex:1;min-width:0}
 #ticker .tt{font-size:13px;font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#fff;text-decoration:none}
