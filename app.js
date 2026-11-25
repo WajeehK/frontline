@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from './vendor/OrbitControls.js';
 import { annotateEvent, isSpeculative } from './eventClass.js';
+import { renderAlert, makeFx } from './alertFx.js';
 
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -906,36 +907,53 @@ function fmtLL(lat, lon) {
 function hmUK(ts) {
   return new Date((ts || 0) * 1000).toLocaleString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit', hour12: false }) + ' UK';
 }
-const VA = { raf: 0, t0: 0, dur: 6800, kind: null, map: null, lat: 0, lon: 0, seed: 1, gen: 0 };
+const VA = { raf: 0, t0: 0, last: 0, dur: 9000, kind: null, map: null, lat: 0, lon: 0, seed: 1, gen: 0, F: null, flir: localStorage.getItem('fl-flir') === '1' };
 const TILEC = {};
-const VA_NOISE = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), d = g.createImageData(128, 128);
-  for (let i = 0; i < d.data.length; i += 4) { const v = Math.random() * 255 | 0; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 40; }
-  g.putImageData(d, 0, 0); return c; })();
-function lonLatTile(lat, lon, z) {
-  const n = 2 ** z, x = Math.floor((lon + 180) / 360 * n);
-  const r = lat * Math.PI / 180, y = Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n);
-  return { x, y, n };
-}
-function loadAlertTiles(lat, lon, z = 13) {
-  const { x, y, n } = lonLatTile(lat, lon, z);
-  const c = document.createElement('canvas'); c.width = c.height = 768; const g = c.getContext('2d');
-  g.fillStyle = '#161a14'; g.fillRect(0, 0, 768, 768);
-  const jobs = [];
-  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-    const tx = ((x + dx) % n + n) % n, ty = Math.max(0, Math.min(n - 1, y + dy));
-    jobs.push(new Promise(res => {
-      const im = new Image(); im.crossOrigin = 'anonymous';
-      im.onload = () => { g.drawImage(im, (dx + 1) * 256, (dy + 1) * 256); res(1); };
-      im.onerror = () => res(0);
-      im.src = `https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/${z}/${ty}/${tx}.jpg`;
-    }));
-  }
-  return Promise.all(jobs).then(() => {
-    // bake a green-grey surveillance grade once
-    g.save(); g.globalCompositeOperation = 'saturation'; g.fillStyle = 'rgba(110,110,110,.62)'; g.fillRect(0, 0, 768, 768); g.restore();
-    g.fillStyle = 'rgba(14, 32, 22, .32)'; g.fillRect(0, 0, 768, 768);
-    return c;
+// Esri World Imagery first (bright, high-res, CORS *), EOX Sentinel-2 cloudless as fallback.
+const TILE_SRC = [
+  (z, y, x) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,
+  (z, y, x) => `https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/g/${z}/${y}/${x}.jpg`];
+function tileImg(z, y, x, si = 0) {
+  return new Promise(res => {
+    if (si >= TILE_SRC.length) return res(null);
+    const im = new Image(); im.crossOrigin = 'anonymous'; im.decoding = 'async';
+    im.onload = () => res(im); im.onerror = () => tileImg(z, y, x, si + 1).then(res);
+    im.src = TILE_SRC[si](z, y, x);
   });
+}
+// 5x5 mosaic around the point; returns canvas with .ox/.oy (target pixel), .sd (detail), .water
+async function loadAlertTiles(lat, lon, z) {
+  const n = 2 ** z, fx = (lon + 180) / 360 * n, r = lat * Math.PI / 180, fy = (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * n;
+  const x = Math.floor(fx), y = Math.floor(fy), RD = 2, N = 5;
+  const raw = document.createElement('canvas'); raw.width = raw.height = N * 256; const g = raw.getContext('2d');
+  g.fillStyle = '#1c2a33'; g.fillRect(0, 0, raw.width, raw.height);
+  let ok = 0;
+  await Promise.all([...Array(N * N)].map(async (_, i) => {
+    const dx = (i % N) - RD, dy = ((i / N) | 0) - RD, tx = ((x + dx) % n + n) % n, ty = Math.max(0, Math.min(n - 1, y + dy));
+    const im = await tileImg(z, ty, tx); if (im) { g.drawImage(im, (dx + RD) * 256, (dy + RD) * 256); ok++; }
+  }));
+  if (!ok) return null;
+  const c = document.createElement('canvas'); c.width = c.height = raw.width; const h = c.getContext('2d');
+  h.filter = 'contrast(1.12) saturate(.92) brightness(1.08)'; h.drawImage(raw, 0, 0); h.filter = 'none';
+  c.ox = (fx - x + RD) * 256; c.oy = (fy - y + RD) * 256; c.z = z; c.sd = 99; c.water = false;
+  try {
+    const s = document.createElement('canvas'); s.width = s.height = 64; const sg = s.getContext('2d'); sg.drawImage(raw, c.ox - 280, c.oy - 280, 560, 560, 0, 0, 64, 64);
+    const d = sg.getImageData(0, 0, 64, 64).data; let m = 0, m2 = 0;
+    for (let i = 0; i < d.length; i += 4) { const l = .3 * d[i] + .59 * d[i + 1] + .11 * d[i + 2]; m += l; m2 += l * l; }
+    m /= 4096; c.sd = Math.sqrt(Math.max(0, m2 / 4096 - m * m));
+    const p = g.getImageData(c.ox | 0, c.oy | 0, 1, 1).data; c.water = p[2] >= p[0] && (p[0] + p[1] + p[2]) / 3 < 95;
+  } catch (_) { }
+  return c;
+}
+// Start close in; if the view is featureless (open sea, desert), zoom out until coastlines/terrain show.
+async function alertMap(lat, lon, kind) {
+  let z = ['tanker', 'warship', 'seizure'].includes(kind) ? 11 : kind === 'nuclear_detonation' ? 10 : 13, best = null;
+  for (let i = 0; i < 4 && z >= 6; i++, z -= 2) {
+    const c = await loadAlertTiles(lat, lon, z).catch(() => null);
+    if (c && (!best || c.sd > best.sd)) best = c;
+    if (c && c.sd >= 14) return c;
+  }
+  return best;
 }
 function stopAlertAnim() {
   if (VA.raf) cancelAnimationFrame(VA.raf);
@@ -948,213 +966,25 @@ function startAlertAnim(kind, loc) {
   VA.kind = kind;
   VA.lat = loc && loc.lat != null ? +loc.lat : 0;
   VA.lon = loc && loc.lon != null ? +loc.lon : 0;
-  VA.t0 = performance.now();
-  VA.seed = (Math.abs((VA.lat * 1e4) | 0) ^ Math.abs((VA.lon * 1e4) | 0)) || 1;
-  const key = (Number.isFinite(VA.lat) && Number.isFinite(VA.lon) && (VA.lat || VA.lon)) ? VA.lat.toFixed(3) + ',' + VA.lon.toFixed(3) : '';
+  VA.t0 = VA.last = performance.now();
+  VA.seed = (Math.abs((VA.lat * 1e4) | 0) ^ Math.abs((VA.lon * 1e4) | 0) ^ kind.length * 7919) || 1;
+  VA.F = makeFx(VA.seed);
+  const key = (Number.isFinite(VA.lat) && Number.isFinite(VA.lon) && (VA.lat || VA.lon)) ? VA.lat.toFixed(3) + ',' + VA.lon.toFixed(3) + ':' + kind : '';
   VA.map = key && TILEC[key] ? TILEC[key] : null;
   if (key && !VA.map) {
     const gen = VA.gen;
-    loadAlertTiles(VA.lat, VA.lon).then(c => { if (c) { TILEC[key] = c; if (VA.gen === gen) VA.map = c; } }).catch(() => { });
+    alertMap(VA.lat, VA.lon, kind).then(c => { if (c) { TILEC[key] = c; if (VA.gen === gen) VA.map = c; } }).catch(() => { });
   }
+  const coord = fmtLL(VA.lat, VA.lon);
   const loop = now => {
     if (!VA.kind) return;
-    const t = now - VA.t0, u = Math.min(1, t / VA.dur);
-    drawAlertFrame(cv, u, t);
+    const t = now - VA.t0, u = Math.min(1, t / VA.dur), dt = (now - VA.last) / 1000; VA.last = now;
+    renderAlert(cv, { F: VA.F, kind: VA.kind, u, ms: t, dt, map: VA.map, flir: VA.flir, coord });
     const bar = $('#vaProg'); if (bar) bar.style.width = (u * 100).toFixed(2) + '%';
-    if (u < 1) VA.raf = requestAnimationFrame(loop); else VA.raf = 0;
+    // keep smoke and fire alive for a few seconds after the sequence ends, then hold
+    VA.raf = t < VA.dur + 6000 ? requestAnimationFrame(loop) : 0;
   };
   VA.raf = requestAnimationFrame(loop);
-}
-function vaRng(i) { let x = (VA.seed + i * 9973) | 0; x ^= x << 13; x ^= x >> 17; x ^= x << 5; return ((x >>> 0) % 1000) / 1000; }
-function vaEase(t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t * (3 - 2 * t); }
-function vaEaseOut(t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return 1 - (1 - t) * (1 - t); }
-function vaEaseIn(t) { t = t < 0 ? 0 : t > 1 ? 1 : t; return t * t; }
-function vaSeg(u, a, b, ease) { const t = b === a ? 0 : Math.max(0, Math.min(1, (u - a) / (b - a))); return ease ? ease(t) : t; }
-function drawAlertFrame(cv, u, ms) {
-  const dpr = Math.min(2, devicePixelRatio || 1);
-  const W = cv.clientWidth || innerWidth, H = cv.clientHeight || innerHeight;
-  if (cv.width !== (W * dpr | 0) || cv.height !== (H * dpr | 0)) { cv.width = W * dpr | 0; cv.height = H * dpr | 0; }
-  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  g.fillStyle = '#0a0e0b'; g.fillRect(0, 0, W, H);
-  // Ken-Burns cover of the 768 mosaic — eased push-in
-  const kbu = vaEase(u), kb = 1 + 0.16 * kbu, panX = (kbu - .5) * 18, panY = (kbu - .5) * -12;
-  if (VA.map) {
-    const side = Math.max(W, H) * kb;
-    g.drawImage(VA.map, (W - side) / 2 + panX, (H - side) / 2 + panY, side, side);
-  }
-  // scanlines + grain
-  g.fillStyle = 'rgba(0,0,0,.16)';
-  for (let y = 0; y < H; y += 3) g.fillRect(0, y, W, 1);
-  g.globalAlpha = .22; const no = ((ms / 80) | 0) % 64;
-  g.drawImage(VA_NOISE, -no, -no, W + 128, H + 128); g.globalAlpha = 1;
-  const cx = W * .5, cy = H * .46, k = e => VA.kind === e;
-  drawFx(g, W, H, cx, cy, u, ms);
-  // HUD reticle + coords + timecode
-  g.save(); g.translate(cx, cy); g.strokeStyle = 'rgba(180,230,190,.85)'; g.lineWidth = 1.2;
-  g.beginPath(); g.arc(0, 0, 16, 0, 7); g.stroke();
-  g.beginPath(); g.moveTo(-28, 0); g.lineTo(-10, 0); g.moveTo(10, 0); g.lineTo(28, 0); g.moveTo(0, -28); g.lineTo(0, -10); g.moveTo(0, 10); g.lineTo(0, 28); g.stroke();
-  g.restore();
-  g.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
-  g.fillStyle = 'rgba(190,220,195,.8)'; g.textAlign = 'left';
-  const ll = fmtLL(VA.lat, VA.lon) || 'NO FIX';
-  g.fillText(ll, cx + 34, cy - 10);
-  const s = Math.floor(ms / 1000), f = Math.floor((ms % 1000) / (1000 / 24));
-  g.fillText('T+' + String(s).padStart(2, '0') + ':' + String(f).padStart(2, '0'), cx + 34, cy + 6);
-}
-function streak(g, x0, y0, x1, y1, u, w, col) {
-  if (u <= 0 || u > 1) return { x: x1, y: y1 };
-  const e = vaEaseIn(u), x = x0 + (x1 - x0) * e, y = y0 + (y1 - y0) * e;
-  const t0 = Math.max(0, e - .34), bx = x0 + (x1 - x0) * t0, by = y0 + (y1 - y0) * t0;
-  const grd = g.createLinearGradient(bx, by, x, y);
-  grd.addColorStop(0, 'rgba(255,220,160,0)'); grd.addColorStop(.55, 'rgba(255,200,120,.35)'); grd.addColorStop(1, col || 'rgba(255,236,200,.95)');
-  g.strokeStyle = grd; g.lineWidth = w; g.lineCap = 'round';
-  g.beginPath(); g.moveTo(bx, by); g.lineTo(x, y); g.stroke();
-  g.strokeStyle = 'rgba(255,250,230,.7)'; g.lineWidth = Math.max(1, w * .4);
-  g.beginPath(); g.moveTo((bx + x) / 2, (by + y) / 2); g.lineTo(x, y); g.stroke();
-  g.fillStyle = '#fff8e0'; g.beginPath(); g.arc(x, y, w * 1.15, 0, 7); g.fill();
-  return { x, y };
-}
-function flash(g, x, y, u, r) {
-  if (u <= 0 || u > 1) return;
-  const a = (1 - vaEaseOut(u)) * .75, R = r * (1 + vaEaseOut(u) * .7);
-  const grd = g.createRadialGradient(x, y, 0, x, y, R);
-  grd.addColorStop(0, `rgba(255,248,220,${a})`); grd.addColorStop(.45, `rgba(255,180,70,${a * .45})`); grd.addColorStop(1, 'rgba(255,180,80,0)');
-  g.fillStyle = grd; g.beginPath(); g.arc(x, y, R, 0, 7); g.fill();
-}
-function ring(g, x, y, u, r, col) {
-  if (u <= 0 || u > 1) return;
-  const e = vaEaseOut(u);
-  g.strokeStyle = col || `rgba(255,220,180,${(1 - e) * .8})`; g.lineWidth = 1.4;
-  g.beginPath(); g.arc(x, y, r * e, 0, 7); g.stroke();
-}
-function smokes(g, x, y, u, n, wind) {
-  if (u <= 0) return;
-  const wx = wind || 28, wy = 10;
-  for (let i = 0; i < n; i++) {
-    const p = vaEaseOut(vaSeg(u, i * .05, 1)), ph = vaRng(30 + i);
-    const sx = x + (ph - .5) * 12 + wx * p, sy = y + (vaRng(80 + i) - .35) * 8 + wy * p - p * 6;
-    const R = 5 + p * 18 + i * .6, a = Math.sin(Math.min(1, p * 1.25) * Math.PI) * .16;
-    g.fillStyle = `rgba(90,90,86,${a})`; g.beginPath(); g.arc(sx, sy, R, 0, 7); g.fill();
-    g.fillStyle = `rgba(120,118,110,${a * .45})`; g.beginPath(); g.arc(sx - 2, sy - 2, R * .55, 0, 7); g.fill();
-  }
-}
-function fireGlow(g, x, y, u, r) {
-  if (u <= 0) return;
-  const a = (.35 + .2 * Math.sin(u * 22)) * Math.min(1, u * 3) * (u < .85 ? 1 : (1 - u) / .15);
-  const grd = g.createRadialGradient(x, y, 0, x, y, r);
-  grd.addColorStop(0, `rgba(255,150,40,${a})`); grd.addColorStop(1, 'rgba(255,80,0,0)');
-  g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
-}
-function delta(g, x, y, ang, s, col) {
-  g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = col || 'rgba(230,230,220,.95)';
-  g.beginPath(); g.moveTo(s, 0); g.lineTo(-s * .7, s * .55); g.lineTo(-s * .4, 0); g.lineTo(-s * .7, -s * .55); g.closePath(); g.fill(); g.restore();
-}
-function shipSil(g, x, y, ang, s, war) {
-  g.save(); g.translate(x, y); g.rotate(ang); g.fillStyle = 'rgba(220,220,210,.92)';
-  g.beginPath(); g.moveTo(s * 1.4, 0); g.lineTo(s * .6, s * .28); g.lineTo(-s * 1.1, s * .26); g.lineTo(-s * 1.35, 0); g.lineTo(-s * 1.1, -s * .26); g.lineTo(s * .6, -s * .28); g.closePath(); g.fill();
-  if (war) { g.fillRect(-s * .15, -s * .12, s * .5, s * .24); g.fillRect(s * .2, -s * .04, s * .5, s * .08); }
-  else { g.fillRect(-s * .2, -s * .14, s * .35, s * .28); }
-  g.restore();
-}
-function wake(g, x, y, ang, u) {
-  g.save(); g.translate(x, y); g.rotate(ang); g.strokeStyle = 'rgba(200,220,230,.35)'; g.lineWidth = 1;
-  g.beginPath(); g.moveTo(-12, 0); g.lineTo(-12 - 30 * u, 8); g.moveTo(-12, 0); g.lineTo(-12 - 30 * u, -8); g.stroke(); g.restore();
-}
-function drawFx(g, W, H, cx, cy, u, ms) {
-  const K = VA.kind, edge = (dir) => dir === 'n' ? [cx + (vaRng(2) - .5) * 80, -20] : dir === 's' ? [cx + (vaRng(3) - .5) * 80, H + 20] : dir === 'w' ? [-20, cy + (vaRng(4) - .5) * 60] : [W + 20, cy + (vaRng(5) - .5) * 60];
-  const hit = (x, y, start, span) => { const t = vaSeg(u, start, start + span); if (t > 0) { flash(g, x, y, Math.min(1, t / .18), 22); ring(g, x, y, t, 36, `rgba(255,210,150,${(1 - t) * .7})`); smokes(g, x, y, Math.max(0, t - .06), 5); } };
-  if (K === 'missile') {
-    const st = streak(g, -10, cy - 80, cx, cy, vaSeg(u, .06, .46), 2.6);
-    if (u < .46) { /* head in flight */ } else { flash(g, cx, cy, vaSeg(u, .46, .58), 26); ring(g, cx, cy, vaSeg(u, .46, .85), 48); smokes(g, cx, cy, vaSeg(u, .48, 1), 7); }
-  } else if (K === 'drone') {
-    for (let i = 0; i < 4; i++) {
-      const a = -2.4 + i * .55, r = 160, x0 = cx + Math.cos(a) * r, y0 = cy + Math.sin(a) * r * .7;
-      const t = vaSeg(u, .08 + i * .05, .48 + i * .05), p = streak(g, x0, y0, cx + (i - 1.5) * 10, cy + (i - 1.5) * 6, t, 1.6, 'rgba(230,230,200,.9)');
-      if (t < 1 && t > 0) delta(g, p.x, p.y, Math.atan2(cy - y0, cx - x0), 6);
-      hit(cx + (i - 1.5) * 10, cy + (i - 1.5) * 6, .48 + i * .06, .4);
-    }
-  } else if (K === 'drone_capture') {
-    const tFly = vaSeg(u, .04, .4), p = streak(g, cx - 140, cy - 70, cx + 10, cy - 6, tFly, 1.4, 'rgba(220,220,200,.85)');
-    if (tFly > 0 && tFly < 1) delta(g, p.x, p.y, .45, 7);
-    const ti = vaSeg(u, .22, .42); streak(g, cx + 80, H + 10, cx + 10, cy - 6, ti, 2, 'rgba(180,255,200,.95)');
-    if (u >= .42) {
-      flash(g, cx + 10, cy - 6, vaSeg(u, .42, .52), 16);
-      const td = vaSeg(u, .42, .92), ang = .45 + td * 6.2;
-      const dx = cx + 10 + Math.cos(ang) * (8 + td * 50), dy = cy - 6 + td * 90;
-      delta(g, dx, dy, ang + 1.2, 7, 'rgba(200,200,190,.9)'); smokes(g, dx, dy, td, 5, 16);
-    }
-  } else if (K === 'air') {
-    const t = vaSeg(u, .08, .58), p = streak(g, -20, cy - 50, W + 20, cy + 30, t, 1.2, 'rgba(230,230,230,.0)');
-    const x = -20 + (W + 40) * t, y = cy - 50 + 80 * t;
-    if (t > 0 && t < 1) { g.save(); g.translate(x, y); g.rotate(.22); g.fillStyle = 'rgba(230,230,225,.95)'; g.beginPath(); g.moveTo(16, 0); g.lineTo(-10, 6); g.lineTo(-6, 0); g.lineTo(-10, -6); g.closePath(); g.fill(); g.fillRect(-2, -9, 3, 18); g.restore(); }
-    hit(cx - 18, cy + 4, .4, .45); hit(cx + 22, cy + 12, .54, .45);
-  } else if (K === 'artillery') {
-    for (let i = 0; i < 7; i++) hit(cx - 40 + i * 14, cy - 16 + (i % 3) * 12, .16 + i * .1, .35);
-  } else if (K === 'intercept') {
-    for (let i = 0; i < 3; i++) {
-      const ix = cx - 30 + i * 30, iy = cy - 8 + (i - 1) * 10;
-      streak(g, ix - 40 + i * 20, -16, ix, iy, vaSeg(u, .08 + i * .06, .48 + i * .04), 2);
-      streak(g, ix + (i - 1) * 40, H + 12, ix, iy, vaSeg(u, .18 + i * .05, .48 + i * .04), 2, 'rgba(170,255,200,.95)');
-      if (u >= .48 + i * .04) { flash(g, ix, iy, vaSeg(u, .48 + i * .04, .62 + i * .04), 18); ring(g, ix, iy, vaSeg(u, .48 + i * .04, .85), 30, `rgba(200,255,210,${Math.max(0, 1 - (u - .48) * 2)})`); }
-    }
-  } else if (K === 'tanker' || K === 'warship') {
-    const t = vaEase(Math.min(1, u / .5)), x = cx - 50 + t * 50, y = cy + 8, ang = 0.05;
-    wake(g, x, y, ang, .6 + t); shipSil(g, x, y, ang, 16, K === 'warship');
-    if (u >= .5) { flash(g, x + 8, y, vaSeg(u, .5, .62), 22); fireGlow(g, x + 6, y, vaSeg(u, .5, 1), 22); smokes(g, x + 6, y - 4, vaSeg(u, .52, 1), 8, 18); }
-  } else if (K === 'seizure') {
-    shipSil(g, cx, cy, 0, 16, false);
-    for (let i = 0; i < 2; i++) {
-      const t = vaEase(vaSeg(u, .08, .7)), x0 = cx + (i ? 110 : -120), y0 = cy + (i ? 70 : -80);
-      const x = x0 + (cx + (i ? 22 : -22) - x0) * t, y = y0 + (cy - y0) * t;
-      shipSil(g, x, y, Math.atan2(cy - y0, cx - x0), 7, true);
-    }
-    const th = u * 6.28, hx = cx + Math.cos(th) * 36, hy = cy + Math.sin(th) * 22;
-    g.strokeStyle = 'rgba(200,220,200,.4)'; g.beginPath(); g.ellipse(cx, cy, 36, 22, 0, 0, 7); g.stroke();
-    g.fillStyle = 'rgba(220,220,210,.95)'; g.beginPath(); g.arc(hx, hy, 3, 0, 7); g.fill();
-    g.strokeStyle = 'rgba(220,220,210,.7)'; g.beginPath(); g.moveTo(hx - 7, hy); g.lineTo(hx + 7, hy); g.stroke();
-  } else if (K === 'nuclear_site') {
-    [[-22, -8], [18, 6], [4, -20]].forEach((p, i) => hit(cx + p[0], cy + p[1], .2 + i * .16, .4));
-  } else if (K === 'facility' || K === 'blast' || K === 'port') {
-    const pts = K === 'port' ? [[-30, 4], [0, 0], [28, 8]] : [[0, 0], [-16, 10], [18, -8]];
-    pts.forEach((p, i) => { hit(cx + p[0], cy + p[1], .22 + i * .14, .45); fireGlow(g, cx + p[0], cy + p[1], vaSeg(u, .3 + i * .14, 1), 18); });
-  } else if (K === 'troop') {
-    const t = vaEase(vaSeg(u, .08, .9));
-    for (let i = 0; i < 5; i++) {
-      const p = Math.max(0, t - i * .06), x = cx - 80 + p * 120, y = cy + Math.sin(p * 2) * 8 + i * 3;
-      g.fillStyle = 'rgba(230,230,200,.9)'; g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill();
-    }
-    g.strokeStyle = 'rgba(230,230,200,.5)'; g.lineWidth = 1.2;
-    g.beginPath(); const tip = cx - 80 + t * 120; g.moveTo(cx - 84, cy); g.lineTo(tip + 10, cy + 6); g.stroke();
-  } else if (K === 'cyber') {
-    g.strokeStyle = `rgba(80,255,160,${.35 + .2 * Math.sin(ms / 70)})`; g.lineWidth = 1;
-    const gl = (u > .35 && u < .75 && ((ms / 80) | 0) % 5 === 0);
-    for (let i = -4; i <= 4; i++) { g.beginPath(); g.moveTo(cx - 90, cy + i * 16 + (gl ? (vaRng(i + 9) - .5) * 8 : 0)); g.lineTo(cx + 90, cy + i * 16); g.stroke(); }
-    for (let i = -5; i <= 5; i++) { g.beginPath(); g.moveTo(cx + i * 16, cy - 70); g.lineTo(cx + i * 16, cy + 70); g.stroke(); }
-    if (u > .45) { g.fillStyle = `rgba(0,0,0,${Math.min(.7, (u - .45) * 1.4)})`; g.fillRect(cx - 100, cy - 80, 200, 160); }
-  } else if (K === 'ceasefire') {
-    smokes(g, cx, cy, Math.max(0, 1 - u), 6, 10);
-    const t = vaSeg(u, .2, .9); if (t) { g.strokeStyle = `rgba(255,255,255,${(1 - t) * .55})`; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, 12 + t * 50, 0, 7); g.stroke(); }
-  } else if (K === 'aircraft_down') {
-    const t = vaSeg(u, .06, .42), x = cx - 120 + t * 130, y = cy - 40 + t * 20;
-    if (t < 1) { g.save(); g.translate(x, y); g.rotate(.2); g.fillStyle = 'rgba(230,230,225,.95)'; g.beginPath(); g.moveTo(14, 0); g.lineTo(-9, 5); g.lineTo(-5, 0); g.lineTo(-9, -5); g.closePath(); g.fill(); g.fillRect(-1, -8, 3, 16); g.restore(); }
-    streak(g, cx + 90, H + 8, x, y, vaSeg(u, .2, .42), 2, 'rgba(170,255,200,.95)');
-    if (u >= .42) { flash(g, cx + 10, cy - 20, vaSeg(u, .42, .54), 16); const td = vaSeg(u, .42, .92), ang = .2 + td * 5; const dx = cx + 10 + Math.cos(ang) * td * 40, dy = cy - 20 + td * 80; g.save(); g.translate(dx, dy); g.rotate(ang + 1); g.fillStyle = 'rgba(200,200,190,.9)'; g.beginPath(); g.moveTo(12, 0); g.lineTo(-8, 5); g.lineTo(-8, -5); g.closePath(); g.fill(); g.restore(); smokes(g, dx, dy, td, 6, 14); }
-  } else if (K === 'barrage') {
-    for (let i = 0; i < 10; i++) {
-      const x = cx + (vaRng(i) - .5) * 90, y = cy + (vaRng(i + 20) - .5) * 50;
-      streak(g, x - 80 - vaRng(i + 3) * 40, -16 - i * 8, x, y, vaSeg(u, .05 + i * .03, .42 + i * .03), 1.8);
-      hit(x, y, .42 + i * .03, .4);
-    }
-  } else if (K === 'assassination') {
-    const t = vaSeg(u, .05, .55), x = cx - 40 + t * 50, y = cy + Math.sin(t * 6) * 6;
-    g.fillStyle = 'rgba(230,230,200,.95)'; g.fillRect(x - 5, y - 3, 10, 6);
-    streak(g, -10, cy - 90, x, y, vaSeg(u, .28, .58), 1.8);
-    if (u >= .58) { flash(g, x, y, vaSeg(u, .58, .7), 14); ring(g, x, y, vaSeg(u, .58, .9), 22); smokes(g, x, y, vaSeg(u, .6, 1), 4, 12); }
-  } else if (K === 'nuclear_detonation') {
-    const t = vaSeg(u, .35, 1);
-    if (t > 0 && t < .12) { g.fillStyle = `rgba(255,255,255,${1 - t / .12})`; g.fillRect(0, 0, W, H); }
-    if (t > 0) { flash(g, cx, cy, Math.min(1, t * 1.4), 80); ring(g, cx, cy, t, Math.min(W, H) * .45, `rgba(255,255,240,${(1 - t) * .8})`); }
-  }
 }
 function flyAlertLoc(e) {
   if (!e || S.tid === 'globe' || !S.th) return;
@@ -1217,6 +1047,13 @@ function showAlert(e) {
 (() => {
   const el = $('#cineHud'); if (!el) return;
   let x0 = null, t0 = 0;
+  const fb = $('#vaFlir');
+  if (fb) {
+    const sync = () => { fb.classList.toggle('on', VA.flir); fb.setAttribute('aria-pressed', VA.flir ? 'true' : 'false'); };
+    sync();
+    ['pointerdown', 'pointerup', 'click'].forEach(t => fb.addEventListener(t, e => e.stopPropagation()));
+    fb.addEventListener('click', () => { VA.flir = !VA.flir; localStorage.setItem('fl-flir', VA.flir ? '1' : '0'); sync(); vib(10); });
+  }
   el.addEventListener('pointerdown', e => { x0 = e.clientX; t0 = performance.now(); });
   el.addEventListener('pointerup', e => {
     if (x0 == null || !S.alertHold) return;
